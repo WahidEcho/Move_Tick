@@ -12,6 +12,7 @@ import {
   UsersRound,
   BarChart3,
   Settings,
+  TicketPercent,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -20,6 +21,7 @@ const TAB_ITEMS = [
   { value: 'invitations', label: 'Invitations', href: 'invitations', icon: Mail },
   { value: 'attendees', label: 'Attendees', href: 'attendees', icon: Users },
   { value: 'tickets', label: 'Tickets', href: 'tickets', icon: Ticket },
+  { value: 'coupons', label: 'Promo Codes', href: 'coupons', icon: TicketPercent },
   { value: 'spaces', label: 'Spaces', href: 'spaces', icon: LayoutGrid },
   { value: 'redeems', label: 'Redeems', href: 'redeems', icon: Gift },
   { value: 'team', label: 'Team', href: 'team', icon: UsersRound },

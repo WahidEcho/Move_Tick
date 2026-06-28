@@ -120,53 +120,29 @@ export async function issueTicket(
 ): Promise<Ticket> {
   const supabase = createServiceClient();
 
-  const { data: ticketType, error: ttError } = await supabase
-    .from('ticket_types')
-    .select('capacity, sold_count')
-    .eq('id', ticketTypeId)
-    .eq('event_id', eventId)
-    .single();
-
-  if (ttError || !ticketType) {
-    throw new Error('Ticket type not found');
-  }
-
-  const capacity = ticketType.capacity as number | null;
-  const soldCount = (ticketType.sold_count as number) ?? 0;
-  if (capacity != null && soldCount >= capacity) {
-    throw new Error('Ticket type is sold out');
-  }
-
+  // Generate the QR token + image in Node (the qrcode lib isn't available in
+  // Postgres), then hand off to the atomic issue_ticket() function which locks
+  // the ticket_type row, re-checks capacity, inserts the ticket, and bumps
+  // sold_count in a single transaction -- eliminating the oversell race.
   const token = generateToken(24);
   const qrCode = await QRCode.toDataURL(token);
 
-  const { data: ticket, error: ticketError } = await supabase
-    .from('tickets')
-    .insert({
-      event_id: eventId,
-      ticket_type_id: ticketTypeId,
-      user_id: userId,
-      qr_token: token,
-      qr_code: qrCode,
-      is_active: true,
-      issued_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
+  const { data: ticket, error } = await supabase.rpc('issue_ticket', {
+    p_event_id: eventId,
+    p_ticket_type_id: ticketTypeId,
+    p_user_id: userId,
+    p_qr_token: token,
+    p_qr_code: qrCode,
+  });
 
-  if (ticketError) throw new Error(`Failed to issue ticket: ${ticketError.message}`);
-
-  const { error: updateError } = await supabase
-    .from('ticket_types')
-    .update({
-      sold_count: soldCount + 1,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', ticketTypeId);
-
-  if (updateError) {
-    await supabase.from('tickets').delete().eq('id', ticket.id);
-    throw new Error(`Failed to increment sold count: ${updateError.message}`);
+  if (error) {
+    if (error.message.includes('TICKET_TYPE_SOLD_OUT')) {
+      throw new Error('Ticket type is sold out');
+    }
+    if (error.message.includes('TICKET_TYPE_NOT_FOUND')) {
+      throw new Error('Ticket type not found');
+    }
+    throw new Error(`Failed to issue ticket: ${error.message}`);
   }
 
   return ticket as Ticket;

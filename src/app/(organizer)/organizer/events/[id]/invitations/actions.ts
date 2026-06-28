@@ -5,6 +5,30 @@ import * as invitationsService from '@/services/invitations.service';
 import { getTicketTypes } from '@/services/tickets.service';
 import type { CSVInviteeRow } from '@/types/domain.types';
 
+export async function addInvitation(
+  eventId: string,
+  orgId: string,
+  invitee: { name: string; email: string; ticketTypeId?: string | null }
+): Promise<{ success: boolean; error?: string }> {
+  if (!invitee.email?.trim()) {
+    return { success: false, error: 'Email is required' };
+  }
+  try {
+    await invitationsService.createInvitation({
+      event_id: eventId,
+      organization_id: orgId,
+      invitee_name: invitee.name?.trim() || invitee.email.trim(),
+      invitee_email: invitee.email.trim().toLowerCase(),
+      ticket_type_id: invitee.ticketTypeId ?? null,
+    });
+    revalidatePath(`/organizer/events/${eventId}/invitations`);
+    revalidatePath(`/organizer/events/${eventId}`);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Failed to add guest' };
+  }
+}
+
 export async function importInvitations(
   eventId: string,
   orgId: string,

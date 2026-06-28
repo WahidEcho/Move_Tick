@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase-server';
+import { createServiceClient, createClient } from '@/lib/supabase-server';
 import type {
   Registration,
   RegistrationStatus,
@@ -7,6 +7,35 @@ import type {
 import type { AttendeeDetails, PaginatedResult } from '@/types/domain.types';
 import { derivePresence } from '@/lib/helpers';
 import * as ticketsService from './tickets.service';
+
+export interface AttendeeSearchResult {
+  ticket_id: string;
+  user_id: string;
+  attendee_name: string;
+  attendee_email: string;
+  ticket_type_name: string;
+  is_checked_in: boolean;
+  ticket_active: boolean;
+  score: number;
+}
+
+/**
+ * Typo-tolerant fuzzy attendee search for organizer/staff door lookup. Uses the
+ * request-scoped AUTHENTICATED client so the search_event_attendees RPC's
+ * event-role gate (can_operate_event) applies. Same RPC the mobile app uses.
+ */
+export async function fuzzySearchAttendees(
+  eventId: string,
+  query: string
+): Promise<AttendeeSearchResult[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc('search_event_attendees', {
+    p_event_id: eventId,
+    p_query: query,
+  });
+  if (error) throw new Error(`Attendee search failed: ${error.message}`);
+  return (data ?? []) as AttendeeSearchResult[];
+}
 
 export interface GetEventAttendeesFilters {
   status?: RegistrationStatus;

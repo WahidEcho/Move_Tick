@@ -3,6 +3,7 @@
 import { createServiceClient } from '@/lib/supabase-server';
 import * as ticketsService from '@/services/tickets.service';
 import * as eventsService from '@/services/events.service';
+import { sendTicketEmail } from '@/services/email.service';
 
 export type RegisterResult =
   | { success: true; registration: { id: string; status: string }; ticket?: { id: string }; message: string }
@@ -139,11 +140,17 @@ export async function registerForEvent(
       return { success: false, message: error.message };
     }
 
+    // Best-effort ticket-delivery email. Never fail registration if email fails.
+    const emailResult = await sendTicketEmail(ticket.id);
+    if (!emailResult.ok) {
+      console.warn(`[register] ticket email not sent for ${ticket.id}: ${emailResult.error}`);
+    }
+
     return {
       success: true,
       registration: registration as { id: string; status: string },
       ticket: { id: ticket.id },
-      message: "You're registered! Check your dashboard for your ticket.",
+      message: "You're registered! Check your email and dashboard for your ticket.",
     };
   } catch (err) {
     return {

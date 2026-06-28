@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { getTicket } from '@/services/tickets.service';
 import { getMovementsByTicketId } from '@/services/eventMovements.service';
 import { getTicketRedeemBalances } from '@/services/redeems.service';
+import { walletAvailability } from '@/lib/wallet/config';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
   const event = ticket.event;
   const ticketType = ticket.ticket_type;
   const eventSlug = event?.slug;
+  const wallet = walletAvailability();
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -79,6 +81,28 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
               </p>
             </CardContent>
           </Card>
+        )}
+
+        {/* Add to mobile wallet (shown only when configured) */}
+        {ticket.qr_token && ticket.is_active && (wallet.apple || wallet.google) && (
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+            {wallet.apple && (
+              <a
+                href={`/api/tickets/${ticket.id}/apple-pass`}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-black px-5 text-sm font-medium text-white hover:bg-black/85"
+              >
+                 Add to Apple Wallet
+              </a>
+            )}
+            {wallet.google && (
+              <a
+                href={`/api/tickets/${ticket.id}/google-pass`}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-5 text-sm font-medium text-foreground hover:bg-muted"
+              >
+                Add to Google Wallet
+              </a>
+            )}
+          </div>
         )}
 
         {/* Event details */}

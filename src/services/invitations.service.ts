@@ -1,9 +1,27 @@
 import { createServiceClient } from '@/lib/supabase-server';
+import { sendInvitationEmail } from './email.service';
 import type {
   EventInvitation,
   InvitationStatus,
 } from '@/types/database.types';
 import type { PaginatedResult, InvitationFunnel } from '@/types/domain.types';
+
+/** Best-effort: send the invitation email and reflect the outcome in status. */
+async function deliverInvitation(invitationId: string): Promise<void> {
+  const supabase = createServiceClient();
+  try {
+    const result = await sendInvitationEmail(invitationId);
+    await supabase
+      .from('event_invitations')
+      .update({
+        status: result.ok ? 'sent' : 'failed',
+        sent_at: result.ok ? new Date().toISOString() : null,
+      })
+      .eq('id', invitationId);
+  } catch (e) {
+    console.warn(`[invitations] delivery failed for ${invitationId}:`, e);
+  }
+}
 
 export type EventInvitationWithTicketType = EventInvitation & {
   ticket_type?: { id: string; name: string; price: number } | null;
@@ -69,6 +87,8 @@ export async function createInvitation(
     .single();
 
   if (error) throw new Error(`Failed to create invitation: ${error.message}`);
+
+  await deliverInvitation((invitation as EventInvitation).id);
   return invitation as EventInvitation;
 }
 
@@ -106,9 +126,17 @@ export async function createBulkInvitations(
     delivery_channel: 'email' as const,
   }));
 
-  const { error } = await supabase.from('event_invitations').insert(rows);
+  const { data: inserted, error } = await supabase
+    .from('event_invitations')
+    .insert(rows)
+    .select('id');
 
   if (error) throw new Error(`Failed to create bulk invitations: ${error.message}`);
+
+  // Best-effort delivery for each created invitation.
+  for (const row of inserted ?? []) {
+    await deliverInvitation((row as { id: string }).id);
+  }
 
   return {
     created: toInsert.length,
