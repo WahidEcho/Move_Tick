@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
 import type { Profile } from '@/types/database.types';
@@ -7,9 +7,16 @@ export function useAuth() {
   const [user, setUser] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const supabase = createClient();
+  // Lazily create the client so it is never instantiated during SSR
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  const getClient = useCallback(() => {
+    if (!supabaseRef.current) supabaseRef.current = createClient();
+    return supabaseRef.current;
+  }, []);
 
   useEffect(() => {
+    const supabase = getClient();
+
     const fetchProfile = async (userId: string) => {
       const { data, error } = await supabase
         .from('profiles')
@@ -25,7 +32,7 @@ export function useAuth() {
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         if (session?.user) {
           await fetchProfile(session.user.id);
         } else {
@@ -48,13 +55,13 @@ export function useAuth() {
     initAuth();
 
     return () => subscription.unsubscribe();
-  }, [supabase]);
+  }, [getClient]);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    await getClient().auth.signOut();
     setUser(null);
     router.refresh();
-  }, [supabase, router]);
+  }, [getClient, router]);
 
   return { user, loading, signOut };
 }
