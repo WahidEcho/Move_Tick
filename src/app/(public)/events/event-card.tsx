@@ -23,14 +23,14 @@ export async function EventCard({ event }: EventCardProps) {
     : null;
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden transition-shadow hover:shadow-md">
-      <Link href={`/events/${event.slug}`} className="block">
-        <div className="aspect-video w-full bg-gradient-to-br from-primary/20 via-primary/10 to-muted">
+    <Card className="group flex h-full flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-brand-purple/40 hover:shadow-lg hover:shadow-brand-purple/10">
+      <Link href={`/events/${event.slug}`} className="block overflow-hidden">
+        <div className="aspect-video w-full overflow-hidden bg-gradient-to-br from-brand-purple/25 via-brand-purple/10 to-muted">
           {event.cover_image_url ? (
             <img
               src={event.cover_image_url}
               alt={event.title}
-              className="size-full object-cover"
+              className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
           ) : null}
         </div>

@@ -100,17 +100,17 @@ export function ticketIssuedEmail(data: TicketEmailData): RenderedEmail {
     .join(', ');
   const inner = `
     <tr><td style="padding:32px 32px 8px 32px;">
-      <p style="margin:0 0 4px 0;color:${BRAND_PURPLE};font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">You're in</p>
+      <p style="margin:0 0 4px 0;color:${BRAND_PURPLE};font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">You're in 🎉</p>
       <h1 style="margin:0 0 16px 0;color:${NEAR_BLACK};font-size:24px;line-height:1.25;">${escapeHtml(data.eventTitle)}</h1>
       <p style="margin:0 0 24px 0;color:#374151;font-size:15px;line-height:1.6;">
-        Hi ${escapeHtml(data.attendeeName)}, your <strong>${escapeHtml(data.ticketTypeName)}</strong> ticket is confirmed.
+        Hi ${escapeHtml(data.attendeeName)} — you're all set! Your <strong>${escapeHtml(data.ticketTypeName)}</strong> ticket is confirmed, and we've attached it to this email as a PDF so you can keep it handy. We can't wait to see you there. 💜
       </p>
       <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px 0;">
         ${data.eventDateLabel ? `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">📅 ${escapeHtml(data.eventDateLabel)}</td></tr>` : ''}
         ${locationLine ? `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">📍 ${locationLine}</td></tr>` : ''}
       </table>
       <div style="background:#f9fafb;border:1px solid #eee;border-radius:12px;padding:20px;text-align:center;margin:0 0 24px 0;">
-        <p style="margin:0 0 12px 0;color:#374151;font-size:14px;">Your QR code is attached, and lives in your ticket wallet:</p>
+        <p style="margin:0 0 12px 0;color:#374151;font-size:14px;">Your ticket PDF is attached. You can also open it any time here:</p>
         ${button(data.ticketUrl, 'View your ticket & QR')}
         ${data.appleWalletUrl || data.googleWalletUrl ? `
         <p style="margin:16px 0 8px 0;color:#9ca3af;font-size:13px;">Or add it to your phone:</p>
@@ -120,7 +120,7 @@ export function ticketIssuedEmail(data: TicketEmailData): RenderedEmail {
         </div>` : ''}
       </div>
       <p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.5;border-left:3px solid ${BRAND_GREEN};padding-left:12px;">
-        Show the QR at the entrance to check in. Keep this email — the attached QR works offline.
+        Just show the QR (from the attached PDF or your wallet) at the entrance — it works offline, so you're covered even with no signal. See you soon!
       </p>
     </td></tr>`;
   return {

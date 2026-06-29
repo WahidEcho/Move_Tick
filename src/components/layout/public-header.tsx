@@ -45,9 +45,10 @@ export function PublicHeader() {
       <nav className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link
           href="/"
-          className="flex items-center gap-2 font-semibold text-foreground transition-colors hover:text-foreground/90"
+          className="group flex items-center gap-2 font-display text-lg font-bold tracking-tight text-foreground transition-colors hover:text-foreground/90"
         >
-          <span className="text-lg">Move Beyond</span>
+          <span className="inline-block size-2 rounded-full bg-brand-green transition-transform group-hover:scale-125" />
+          Move-Tick
         </Link>
 
         {/* Desktop nav */}

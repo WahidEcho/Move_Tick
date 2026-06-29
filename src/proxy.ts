@@ -2,7 +2,19 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const PUBLIC_ROUTES = ['/', '/events', '/login', '/signup', '/apply-organizer'];
+const PUBLIC_ROUTES = [
+  '/',
+  '/events',
+  '/login',
+  '/signup',
+  '/apply-organizer',
+  '/about',
+  '/contact',
+  '/terms',
+  '/privacy',
+  '/forgot-password',
+  '/reset-password',
+];
 const ATTENDEE_ROUTES = ['/dashboard', '/tickets', '/invitations', '/profile'];
 const ORGANIZER_ROUTES = ['/organizer'];
 const ADMIN_ROUTES = ['/admin'];

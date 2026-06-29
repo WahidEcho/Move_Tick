@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { createClient } from '@/lib/supabase-browser';
+import { getMyOrganization, updateOrganizationSettings } from './actions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,20 +44,7 @@ export default function OrganizerSettingsPage() {
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-      const { data: membership } = await supabase
-        .from('organization_members')
-        .select('organization:organizations(*)')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single();
-
-      const organization = membership?.organization as Organization | undefined;
+      const organization = await getMyOrganization();
       if (organization) {
         setOrg(organization);
         reset({
@@ -82,25 +69,20 @@ export default function OrganizerSettingsPage() {
     setError(null);
     setSuccess(false);
 
-    const supabase = createClient();
-    const { error: updateError } = await supabase
-      .from('organizations')
-      .update({
-        name: data.name,
-        description: data.description || null,
-        website: data.website || null,
-        instagram: data.instagram || null,
-        linkedin: data.linkedin || null,
-        country: data.country || null,
-        city: data.city || null,
-        logo_url: data.logo_url || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', org.id);
+    const result = await updateOrganizationSettings({
+      name: data.name,
+      description: data.description,
+      website: data.website,
+      instagram: data.instagram,
+      linkedin: data.linkedin,
+      country: data.country,
+      city: data.city,
+      logo_url: data.logo_url,
+    });
 
     setSaving(false);
-    if (updateError) {
-      setError(updateError.message);
+    if (!result.success) {
+      setError(result.error ?? 'Failed to save settings');
     } else {
       setSuccess(true);
       setOrg((prev) => prev ? { ...prev, ...data } : null);

@@ -2,6 +2,8 @@ import { createServiceClient } from '@/lib/supabase-server';
 import { sendEmail, dataUrlToBase64, type SendEmailResult } from '@/lib/email';
 import { ticketIssuedEmail, invitationEmail } from '@/lib/email-templates';
 import { walletAvailability } from '@/lib/wallet/config';
+import { generateTicketPdf } from '@/lib/ticket-pdf';
+import type { EmailAttachment } from '@/lib/email';
 import { format } from 'date-fns';
 
 /**
@@ -60,9 +62,27 @@ export async function sendTicketEmail(ticketId: string): Promise<SendEmailResult
   });
 
   const qrDataUrl = ticket.qr_code as string | null;
-  const attachments = qrDataUrl
-    ? [{ filename: 'ticket-qr.png', content: dataUrlToBase64(qrDataUrl) }]
-    : undefined;
+  let attachments: EmailAttachment[] | undefined;
+  if (qrDataUrl) {
+    try {
+      const pdfBytes = await generateTicketPdf({
+        eventTitle: event?.title || 'Your event',
+        dateLabel,
+        venue: event?.venue,
+        city: event?.city,
+        ticketTypeName: ticketType?.name || 'Ticket',
+        attendeeName: profile?.full_name || 'Guest',
+        qrPngDataUrl: qrDataUrl,
+      });
+      attachments = [
+        { filename: 'ticket.pdf', content: Buffer.from(pdfBytes).toString('base64') },
+      ];
+    } catch (e) {
+      // Fall back to the raw QR PNG if PDF generation fails.
+      console.warn('[email] ticket PDF generation failed, attaching QR PNG instead:', e);
+      attachments = [{ filename: 'ticket-qr.png', content: dataUrlToBase64(qrDataUrl) }];
+    }
+  }
 
   return sendEmail({ to, subject, html, attachments });
 }
