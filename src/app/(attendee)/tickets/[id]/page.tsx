@@ -40,6 +40,12 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
   const eventSlug = event?.slug;
   const wallet = walletAvailability();
 
+  // QR/ticket validity ends 24h after the event end.
+  const isExpired = event?.end_date
+    ? Date.now() > new Date(event.end_date).getTime() + 24 * 60 * 60 * 1000
+    : false;
+  const isUsable = ticket.is_active && !isExpired;
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <Link
@@ -60,8 +66,8 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
               {ticketType?.name ?? 'Ticket'}
             </p>
           </div>
-          <Badge variant={ticket.is_active ? 'default' : 'secondary'}>
-            {ticket.is_active ? 'Active' : 'Inactive'}
+          <Badge variant={isUsable ? 'default' : 'secondary'}>
+            {!ticket.is_active ? 'Inactive' : isExpired ? 'Expired' : 'Active'}
           </Badge>
         </div>
 
@@ -84,7 +90,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
         )}
 
         {/* Add to mobile wallet (shown only when configured) */}
-        {ticket.qr_token && ticket.is_active && (wallet.apple || wallet.google) && (
+        {ticket.qr_token && isUsable && (wallet.apple || wallet.google) && (
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
             {wallet.apple && (
               <a

@@ -5,6 +5,8 @@ export interface WalletTicketData {
   qrToken: string;
   eventTitle: string;
   eventDateISO?: string | null;
+  /** Event end (ISO). The pass expires 24h after this. */
+  eventEndISO?: string | null;
   venue?: string | null;
   city?: string | null;
   ticketTypeName: string;

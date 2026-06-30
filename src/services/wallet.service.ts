@@ -14,7 +14,7 @@ async function loadWalletTicket(ticketId: string): Promise<WalletTicketData | nu
   const { data, error } = await supabase
     .from('tickets')
     .select(
-      'id, qr_token, profile:profiles(full_name), event:events(title, start_date, venue, city), ticket_type:ticket_types(name)'
+      'id, qr_token, profile:profiles(full_name), event:events(title, start_date, end_date, venue, city), ticket_type:ticket_types(name)'
     )
     .eq('id', ticketId)
     .single();
@@ -22,7 +22,7 @@ async function loadWalletTicket(ticketId: string): Promise<WalletTicketData | nu
   if (error || !data || !data.qr_token) return null;
 
   const profile = data.profile as { full_name?: string } | null;
-  const event = data.event as { title?: string; start_date?: string; venue?: string; city?: string } | null;
+  const event = data.event as { title?: string; start_date?: string; end_date?: string; venue?: string; city?: string } | null;
   const ticketType = data.ticket_type as { name?: string } | null;
 
   return {
@@ -30,6 +30,7 @@ async function loadWalletTicket(ticketId: string): Promise<WalletTicketData | nu
     qrToken: data.qr_token as string,
     eventTitle: event?.title ?? 'Event',
     eventDateISO: event?.start_date ?? null,
+    eventEndISO: event?.end_date ?? null,
     venue: event?.venue ?? null,
     city: event?.city ?? null,
     ticketTypeName: ticketType?.name ?? 'Ticket',

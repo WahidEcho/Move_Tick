@@ -22,6 +22,11 @@ export async function generateApplePass(ticket: WalletTicketData): Promise<Buffe
   const cfg = getAppleConfig();
   if (!cfg) return null;
 
+  // Pass expires 24h after the event ends, then Wallet marks it expired.
+  const expirationDate = ticket.eventEndISO
+    ? new Date(new Date(ticket.eventEndISO).getTime() + 24 * 60 * 60 * 1000).toISOString()
+    : undefined;
+
   const pass = new PKPass(
     {
       'icon.png': asset('icon.png'),
@@ -48,6 +53,11 @@ export async function generateApplePass(ticket: WalletTicketData): Promise<Buffe
   );
 
   pass.type = 'eventTicket';
+
+  // expirationDate is a "method prop" in passkit-generator — set via the method.
+  if (expirationDate) {
+    pass.setExpirationDate(new Date(expirationDate));
+  }
 
   pass.primaryFields.push({
     key: 'event',

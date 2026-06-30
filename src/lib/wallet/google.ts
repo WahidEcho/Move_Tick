@@ -44,6 +44,18 @@ export function getGoogleWalletSaveUrl(ticket: WalletTicketData): string | null 
     ...(ticket.eventDateISO
       ? { dateTime: { start: ticket.eventDateISO } }
       : {}),
+    // Pass becomes invalid 24h after the event ends.
+    ...(ticket.eventEndISO
+      ? {
+          validTimeInterval: {
+            end: {
+              date: new Date(
+                new Date(ticket.eventEndISO).getTime() + 24 * 60 * 60 * 1000
+              ).toISOString(),
+            },
+          },
+        }
+      : {}),
     ...(location
       ? { venue: { name: { defaultValue: { language: 'en-US', value: location } }, address: { defaultValue: { language: 'en-US', value: location } } } }
       : {}),
