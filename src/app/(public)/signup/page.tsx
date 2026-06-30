@@ -41,7 +41,7 @@ export default function SignupPage() {
     setSubmitError(null);
     const supabase = createClient();
 
-    const { data: authData, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
       options: {
@@ -55,23 +55,8 @@ export default function SignupPage() {
       return;
     }
 
-    if (authData.user) {
-      const { error: profileError } = await supabase.from('profiles').upsert(
-        {
-          id: authData.user.id,
-          email: data.email,
-          full_name: data.full_name,
-          platform_role: 'attendee',
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'id' }
-      );
-
-      if (profileError) {
-        console.error('Profile creation error:', profileError);
-      }
-    }
-
+    // The profile row (with full_name + default 'attendee' role) is created
+    // server-side by the handle_new_user trigger — no client DB write needed.
     router.push('/dashboard');
     router.refresh();
   };
