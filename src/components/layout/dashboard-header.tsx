@@ -95,21 +95,19 @@ export function DashboardHeader({
         <div className="flex shrink-0 items-center gap-2">
           {actions}
           <DropdownMenu>
-            <DropdownMenuTrigger>
-              <Button variant="ghost" size="icon" className="rounded-full">
-                <Avatar size="sm" className="size-8">
-                  <AvatarImage
-                    src={user?.avatar_url ?? undefined}
-                    alt={user?.full_name ?? user?.email ?? 'User'}
-                  />
-                  <AvatarFallback className="text-xs">
-                    {user
-                      ? getInitials(user.full_name, user.email)
-                      : 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="sr-only">Account menu</span>
-              </Button>
+            <DropdownMenuTrigger
+              render={<Button variant="ghost" size="icon" className="rounded-full" />}
+            >
+              <Avatar size="sm" className="size-8">
+                <AvatarImage
+                  src={user?.avatar_url ?? undefined}
+                  alt={user?.full_name ?? user?.email ?? 'User'}
+                />
+                <AvatarFallback className="text-xs">
+                  {user ? getInitials(user.full_name, user.email) : 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <span className="sr-only">Account menu</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onSelect={() => window.location.assign('/dashboard')}>

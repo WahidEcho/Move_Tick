@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { createCouponAction, toggleCouponAction, deleteCouponAction } from './ac
 import type { Coupon } from '@/services/coupons.service';
 
 export function CouponsClient({ eventId, coupons }: { eventId: string; coupons: Coupon[] }) {
+  const router = useRouter();
   const [code, setCode] = useState('');
   const [type, setType] = useState<'percent' | 'fixed'>('percent');
   const [value, setValue] = useState('');
@@ -43,6 +45,7 @@ export function CouponsClient({ eventId, coupons }: { eventId: string; coupons: 
     setValue('');
     setMaxRedemptions('');
     setValidUntil('');
+    router.refresh();
   };
 
   return (
@@ -99,6 +102,7 @@ export function CouponsClient({ eventId, coupons }: { eventId: string; coupons: 
 }
 
 function CouponRow({ eventId, coupon }: { eventId: string; coupon: Coupon }) {
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const discount = coupon.discount_type === 'percent' ? `${coupon.discount_value}% off` : `${coupon.discount_value} EGP off`;
   const uses = coupon.max_redemptions != null
@@ -122,11 +126,11 @@ function CouponRow({ eventId, coupon }: { eventId: string; coupon: Coupon }) {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button variant="outline" size="sm" disabled={busy}
-            onClick={async () => { setBusy(true); await toggleCouponAction(eventId, coupon.id, !coupon.is_active); setBusy(false); }}>
+            onClick={async () => { setBusy(true); await toggleCouponAction(eventId, coupon.id, !coupon.is_active); setBusy(false); router.refresh(); }}>
             {coupon.is_active ? 'Disable' : 'Enable'}
           </Button>
           <Button variant="ghost" size="icon" disabled={busy}
-            onClick={async () => { setBusy(true); await deleteCouponAction(eventId, coupon.id); setBusy(false); }}>
+            onClick={async () => { setBusy(true); await deleteCouponAction(eventId, coupon.id); setBusy(false); router.refresh(); }}>
             <Trash2 className="size-4 text-destructive" />
           </Button>
         </div>
