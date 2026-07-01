@@ -1,20 +1,34 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar, MapPin, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import type { EventWithDetails } from '@/services/events.service';
-import { getEventStats } from '@/services/events.service';
 
 interface EventCardProps {
   event: EventWithDetails;
+  /** Confirmed/approved registrations — batched by the parent page (avoids a per-card query). */
+  confirmedCount: number;
 }
 
-export async function EventCard({ event }: EventCardProps) {
-  const stats = await getEventStats(event.id);
+/**
+ * Cover URLs are organizer-provided free text. Only Supabase Storage images go
+ * through the optimizer (matches next.config remotePatterns); any other host is
+ * served as-is so arbitrary URLs don't crash next/image.
+ */
+export function isOptimizableImage(url: string): boolean {
+  try {
+    const { hostname, pathname } = new URL(url);
+    return hostname.endsWith('.supabase.co') && pathname.startsWith('/storage/v1/object/public/');
+  } catch {
+    return false;
+  }
+}
+
+export function EventCard({ event, confirmedCount }: EventCardProps) {
   const capacity = event.capacity ?? null;
-  const confirmedCount = stats.confirmed;
   const isFull = capacity !== null && confirmedCount >= capacity;
   const capacityStatus = capacity
     ? isFull
@@ -25,12 +39,15 @@ export async function EventCard({ event }: EventCardProps) {
   return (
     <Card className="group flex h-full flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-brand-purple/40 hover:shadow-lg hover:shadow-brand-purple/10">
       <Link href={`/events/${event.slug}`} className="block overflow-hidden">
-        <div className="aspect-video w-full overflow-hidden bg-gradient-to-br from-brand-purple/25 via-brand-purple/10 to-muted">
+        <div className="relative aspect-video w-full overflow-hidden bg-gradient-to-br from-brand-purple/25 via-brand-purple/10 to-muted">
           {event.cover_image_url ? (
-            <img
+            <Image
               src={event.cover_image_url}
               alt={event.title}
-              className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              unoptimized={!isOptimizableImage(event.cover_image_url)}
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
             />
           ) : null}
         </div>

@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase-server';
 import { sendEmail, dataUrlToBase64, type SendEmailResult } from '@/lib/email';
 import { ticketIssuedEmail, invitationEmail } from '@/lib/email-templates';
 import { walletAvailability } from '@/lib/wallet/config';
+import { getAppUrl as appUrl } from '@/lib/app-url';
 import { generateTicketPdf } from '@/lib/ticket-pdf';
 import type { EmailAttachment } from '@/lib/email';
 import { format } from 'date-fns';
@@ -11,10 +12,6 @@ import { format } from 'date-fns';
  * core flow (registration, issuance) if an email send fails — these return a
  * result rather than throwing.
  */
-
-function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
-}
 
 /**
  * Send the "your ticket is confirmed" email for an issued ticket, with the QR

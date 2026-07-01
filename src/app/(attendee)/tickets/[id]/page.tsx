@@ -23,6 +23,12 @@ interface TicketDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
+/** QR/ticket validity ends 24h after the event end (evaluated at request time). */
+function isTicketExpired(endDate: string | null | undefined): boolean {
+  if (!endDate) return false;
+  return Date.now() > new Date(endDate).getTime() + 24 * 60 * 60 * 1000;
+}
+
 export default async function TicketDetailPage({ params }: TicketDetailPageProps) {
   const profile = await requireAuth();
   const { id } = await params;
@@ -41,9 +47,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
   const wallet = walletAvailability();
 
   // QR/ticket validity ends 24h after the event end.
-  const isExpired = event?.end_date
-    ? Date.now() > new Date(event.end_date).getTime() + 24 * 60 * 60 * 1000
-    : false;
+  const isExpired = isTicketExpired(event?.end_date);
   const isUsable = ticket.is_active && !isExpired;
 
   return (

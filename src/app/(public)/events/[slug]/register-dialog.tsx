@@ -1,10 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { createClient } from '@/lib/supabase-browser';
 import {
   Dialog,
@@ -15,19 +12,21 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { FormField } from '@/components/forms/form-field';
 import { Loader2, Minus, Plus } from 'lucide-react';
 import { registerForEvent } from './register-action';
 import { startTicketPurchase, previewCoupon, type CouponPreview } from './purchase-action';
 import type { EventWithDetails } from '@/services/events.service';
 import type { TicketType } from '@/types/database.types';
 
-const registerFormSchema = z.object({
-  full_name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
-});
-
-type RegisterFormData = z.infer<typeof registerFormSchema>;
+/**
+ * Auth state resolved when the dialog opens. Registration only needs the
+ * account (name/email live on the profile server-side), so logged-in users
+ * get a one-click confirm instead of a form.
+ */
+type AuthState =
+  | { status: 'loading' }
+  | { status: 'anon' }
+  | { status: 'ready'; userId: string; name: string | null; email: string | null };
 
 interface RegisterDialogProps {
   event: EventWithDetails;
@@ -48,8 +47,10 @@ export function RegisterDialog({
   const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
+  const [auth, setAuth] = useState<AuthState>({ status: 'loading' });
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
 
   const isPaid = Number(ticketType.price) > 0;
 
@@ -57,42 +58,63 @@ export function RegisterDialog({
   const [quantity, setQuantity] = useState(1);
   const [couponCode, setCouponCode] = useState('');
   const [coupon, setCoupon] = useState<CouponPreview | null>(null);
-  const [processing, setProcessing] = useState(false);
 
   const unitMajor = coupon?.valid ? coupon.discountedUnitMajor ?? Number(ticketType.price) : Number(ticketType.price);
   const total = (unitMajor * quantity).toFixed(2);
 
-  const form = useForm<RegisterFormData>({
-    resolver: zodResolver(registerFormSchema),
-    defaultValues: { full_name: '', email: '' },
-  });
+  // Resolve who's registering as soon as the dialog opens.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (!user) {
+        setAuth({ status: 'anon' });
+        return;
+      }
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', user.id)
+        .single();
+      if (cancelled) return;
+      setAuth({
+        status: 'ready',
+        userId: user.id,
+        name: profile?.full_name ?? null,
+        email: profile?.email ?? user.email ?? null,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, supabase]);
 
-  async function requireUser(): Promise<string | null> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      router.push(`/login?redirect=${encodeURIComponent(`/events/${event.slug}`)}`);
-      return null;
-    }
-    return user.id;
-  }
+  const goToLogin = () => {
+    router.push(`/login?redirect=${encodeURIComponent(`/events/${event.slug}`)}`);
+  };
 
-  const onSubmitFree = async (data: RegisterFormData) => {
-    void data;
+  const onConfirmFree = async () => {
+    if (auth.status !== 'ready') return;
     setSubmitError(null);
-    const userId = await requireUser();
-    if (!userId) return;
-    const result = await registerForEvent(event.id, ticketType.id, userId);
+    setProcessing(true);
+    const result = await registerForEvent(event.id, ticketType.id, auth.userId);
     if (!result.success) {
       setSubmitError(result.message);
+      setProcessing(false);
       return;
     }
-    setSuccessMessage(result.message);
     if (result.ticket) {
-      router.push('/tickets');
-      router.refresh();
-      setOpen(false);
-      return;
+      // Ticket issued immediately — take the user straight to their QR.
+      // Hard navigation: router.push + router.refresh race and can cancel
+      // the transition (same bug the login page had).
+      window.location.assign(`/tickets/${result.ticket.id}`);
+      return; // keep the spinner while navigating
     }
+    // Pending approval / waitlisted — show the status message.
+    setProcessing(false);
+    setSuccessMessage(result.message);
     router.refresh();
     setTimeout(() => {
       setOpen(false);
@@ -108,17 +130,13 @@ export function RegisterDialog({
   };
 
   const onBuy = async () => {
+    if (auth.status !== 'ready') return;
     setSubmitError(null);
     setProcessing(true);
-    const userId = await requireUser();
-    if (!userId) {
-      setProcessing(false);
-      return;
-    }
     const result = await startTicketPurchase(
       event.id,
       ticketType.id,
-      userId,
+      auth.userId,
       quantity,
       coupon?.valid ? couponCode.trim() : null
     );
@@ -152,6 +170,20 @@ export function RegisterDialog({
         {successMessage ? (
           <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4 text-green-800 dark:text-green-200">
             <p>{successMessage}</p>
+          </div>
+        ) : auth.status === 'loading' ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : auth.status === 'anon' ? (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Sign in or create an account to {isPaid ? 'buy tickets' : 'register'} —
+              you&apos;ll come right back to this event.
+            </p>
+            <Button className="w-full" onClick={goToLogin}>
+              Sign in to continue
+            </Button>
           </div>
         ) : isPaid ? (
           <div className="space-y-4">
@@ -202,27 +234,32 @@ export function RegisterDialog({
                 : `Pay ${total} EGP`}
             </Button>
             <p className="text-center text-xs text-muted-foreground">
-              You'll be redirected to XPay's secure checkout.
+              You&apos;ll be redirected to XPay&apos;s secure checkout.
             </p>
           </div>
         ) : (
-          <form onSubmit={form.handleSubmit(onSubmitFree)} className="space-y-4">
+          <div className="space-y-4">
             <p className="text-sm text-muted-foreground">{ticketType.name} — Free</p>
-            <FormField label="Full name" name="full_name" error={form.formState.errors.full_name?.message} required>
-              <Input {...form.register('full_name')} placeholder="Your name" autoComplete="name"
-                aria-invalid={!!form.formState.errors.full_name} />
-            </FormField>
-            <FormField label="Email" name="email" error={form.formState.errors.email?.message} required>
-              <Input {...form.register('email')} type="email" placeholder="you@example.com"
-                autoComplete="email" aria-invalid={!!form.formState.errors.email} />
-            </FormField>
+
+            {/* One-click confirm: the ticket is issued to the signed-in account. */}
+            <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+              <p className="font-medium">{auth.name || auth.email}</p>
+              {auth.name && auth.email && (
+                <p className="text-muted-foreground">{auth.email}</p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Your ticket and QR code will be issued to this account.
+            </p>
+
             {submitError && <p className="text-sm text-destructive" role="alert">{submitError}</p>}
-            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting
+
+            <Button type="button" className="w-full" onClick={onConfirmFree} disabled={processing}>
+              {processing
                 ? <><Loader2 className="size-4 animate-spin" /> Registering…</>
-                : 'Complete registration'}
+                : 'Confirm registration'}
             </Button>
-          </form>
+          </div>
         )}
       </DialogContent>
     </Dialog>

@@ -1,12 +1,9 @@
 import jwt from 'jsonwebtoken';
 import { getGoogleConfig } from './config';
 import type { WalletTicketData } from './types';
+import { getAppUrl as appUrl } from '@/lib/app-url';
 
 const BRAND_PURPLE_HEX = '#5B3BE8';
-
-function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
-}
 
 /**
  * Build an "Add to Google Wallet" save URL for a ticket, or null if Google

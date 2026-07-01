@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getPublicEvents } from '@/services/events.service';
+import { getPublicEvents, getConfirmedCountsByEvent } from '@/services/events.service';
 import { EVENT_CATEGORIES } from '@/lib/constants';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,9 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
     page,
     page_size: 12,
   });
+
+  // One batched query for all "spots left" badges (was a per-card query).
+  const confirmedCounts = await getConfirmedCountsByEvent(events.map((e) => e.id));
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-12">
@@ -107,7 +110,11 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
         <>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {events.map((event) => (
-              <EventCard key={event.id} event={event} />
+              <EventCard
+                key={event.id}
+                event={event}
+                confirmedCount={confirmedCounts[event.id] ?? 0}
+              />
             ))}
           </div>
 

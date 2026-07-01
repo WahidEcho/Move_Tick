@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getActiveOrganizerOrg } from '@/lib/auth';
 import {
   getOrganizationEvents,
-  getEventStats,
+  getRegistrationCountsByEvent,
 } from '@/services/events.service';
 import { EventsListClient } from './events-list-client';
 
@@ -43,12 +43,9 @@ export default async function OrganizerEventsPage({
 
   const result = await getOrganizationEvents(org.id, filters);
 
-  const registrationCounts: Record<string, number> = {};
-  await Promise.all(
-    result.data.map(async (e) => {
-      const stats = await getEventStats(e.id);
-      registrationCounts[e.id] = stats.registrations;
-    })
+  // One batched query for all cards (was an N+1: getEventStats per event).
+  const registrationCounts = await getRegistrationCountsByEvent(
+    result.data.map((e) => e.id)
   );
 
   return (

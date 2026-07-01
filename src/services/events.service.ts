@@ -358,33 +358,81 @@ export async function getOrganizationEvents(
   };
 }
 
+/**
+ * Total registration counts for a set of events in ONE query (the organizer
+ * events list previously called getEventStats per event — an N+1 that cost
+ * ~4 queries per card).
+ */
+export async function getRegistrationCountsByEvent(
+  eventIds: string[]
+): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  if (eventIds.length === 0) return counts;
+
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from('registrations')
+    .select('event_id')
+    .in('event_id', eventIds);
+
+  for (const id of eventIds) counts[id] = 0;
+  for (const row of data ?? []) {
+    counts[row.event_id] = (counts[row.event_id] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * Confirmed/approved registration counts for a set of events in one query —
+ * used by the public events grid ("spots left" badge) instead of a
+ * per-card getEventStats call.
+ */
+export async function getConfirmedCountsByEvent(
+  eventIds: string[]
+): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  if (eventIds.length === 0) return counts;
+
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from('registrations')
+    .select('event_id')
+    .in('event_id', eventIds)
+    .in('status', ['confirmed', 'approved']);
+
+  for (const id of eventIds) counts[id] = 0;
+  for (const row of data ?? []) {
+    counts[row.event_id] = (counts[row.event_id] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export async function getEventStats(eventId: string): Promise<EventStats> {
   const supabase = createServiceClient();
 
-  const { data: event } = await supabase
-    .from('events')
-    .select('capacity')
-    .eq('id', eventId)
-    .single();
+  // Independent counts — run them in parallel instead of one after another.
+  const [eventRes, registrationsRes, confirmedRes, checkInRes] = await Promise.all([
+    supabase.from('events').select('capacity').eq('id', eventId).single(),
+    supabase
+      .from('registrations')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId),
+    supabase
+      .from('registrations')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+      .in('status', ['confirmed', 'approved']),
+    supabase
+      .from('event_movements')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_id', eventId)
+      .eq('movement_type', 'check_in'),
+  ]);
 
-  const { count: registrationsCount } = await supabase
-    .from('registrations')
-    .select('*', { count: 'exact', head: true })
-    .eq('event_id', eventId);
-
-  const { count: confirmedCount } = await supabase
-    .from('registrations')
-    .select('*', { count: 'exact', head: true })
-    .eq('event_id', eventId)
-    .in('status', ['confirmed', 'approved']);
-
-  const { count: checkInCount } = await supabase
-    .from('event_movements')
-    .select('*', { count: 'exact', head: true })
-    .eq('event_id', eventId)
-    .eq('movement_type', 'check_in');
-
-  const checkedIn = checkInCount ?? 0;
+  const event = eventRes.data;
+  const registrationsCount = registrationsRes.count;
+  const confirmedCount = confirmedRes.count;
+  const checkedIn = checkInRes.count ?? 0;
 
   return {
     registrations: registrationsCount ?? 0,

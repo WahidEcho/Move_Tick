@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { getEventBySlug, getEventStats } from '@/services/events.service';
 import { getTicketTypes } from '@/services/tickets.service';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { RegisterDialog } from './register-dialog';
+import { isOptimizableImage } from '../event-card';
 
 interface EventPageProps {
   params: Promise<{ slug: string }>;
@@ -50,10 +52,14 @@ export default async function EventPage({ params }: EventPageProps) {
       {/* Cover */}
       <div className="relative h-64 w-full overflow-hidden bg-gradient-to-br from-primary/30 via-primary/20 to-muted sm:h-80">
         {event.cover_image_url ? (
-          <img
+          <Image
             src={event.cover_image_url}
             alt={event.title}
-            className="size-full object-cover"
+            fill
+            priority
+            sizes="100vw"
+            unoptimized={!isOptimizableImage(event.cover_image_url)}
+            className="object-cover"
           />
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />

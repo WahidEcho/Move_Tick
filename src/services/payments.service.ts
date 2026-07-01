@@ -3,10 +3,7 @@ import { createCheckoutSession, createRefund } from '@/lib/xpay/client';
 import { validateCoupon } from './coupons.service';
 import * as ticketsService from './tickets.service';
 import { sendTicketEmail } from './email.service';
-
-function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
-}
+import { getAppUrl as appUrl } from '@/lib/app-url';
 
 export interface CreateCheckoutInput {
   eventId: string;

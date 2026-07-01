@@ -94,22 +94,30 @@ export async function getEventAnalytics(eventId: string): Promise<EventAnalytics
     failed: invitations.filter((i) => i.status === 'failed').length,
   };
 
+  // One query for all spaces' movements (was a per-space query in a loop).
+  const { data: allSpaceMovements } = spaces.length
+    ? await supabase
+        .from('space_movements')
+        .select('space_id, ticket_id, movement_type')
+        .in('space_id', spaces.map((s) => s.id))
+    : { data: [] };
+
+  const movementsBySpace = new Map<string, { ticket_id: string; movement_type: string }[]>();
+  for (const m of allSpaceMovements ?? []) {
+    const list = movementsBySpace.get(m.space_id) ?? [];
+    list.push(m);
+    movementsBySpace.set(m.space_id, list);
+  }
+
   const space_summaries: { space_id: string; name: string; current_occupancy: number; capacity: number | null }[] = [];
   for (const space of spaces) {
-    const { data: spaceMovements } = await supabase
-      .from('space_movements')
-      .select('ticket_id, movement_type')
-      .eq('space_id', space.id);
-
-    const sm = spaceMovements ?? [];
-    const spaceCheckIns = sm.filter((m) => m.movement_type === 'check_in');
-    const spaceCheckOuts = sm.filter((m) => m.movement_type === 'check_out');
+    const sm = movementsBySpace.get(space.id) ?? [];
     const spaceTicketCount = new Map<string, number>();
-    for (const m of spaceCheckIns) {
-      spaceTicketCount.set(m.ticket_id, (spaceTicketCount.get(m.ticket_id) ?? 0) + 1);
-    }
-    for (const m of spaceCheckOuts) {
-      spaceTicketCount.set(m.ticket_id, (spaceTicketCount.get(m.ticket_id) ?? 0) - 1);
+    for (const m of sm) {
+      const delta = m.movement_type === 'check_in' ? 1 : m.movement_type === 'check_out' ? -1 : 0;
+      if (delta !== 0) {
+        spaceTicketCount.set(m.ticket_id, (spaceTicketCount.get(m.ticket_id) ?? 0) + delta);
+      }
     }
     const current_occupancy = Array.from(spaceTicketCount.values()).filter((v) => v > 0).length;
 
@@ -230,27 +238,32 @@ export async function getOrganizerDashboardSummary(orgId: string): Promise<Organ
   const total_invitations = invResult.count ?? 0;
   const active_staff = staffResult.count ?? 0;
 
-  const { count: totalRegs } = await supabase
-    .from('registrations')
-    .select('id', { count: 'exact', head: true })
-    .in('event_id', eventIds);
-
-  const total_registrations = totalRegs ?? 0;
-
-  const capacity_overview: { event_id: string; title: string; capacity: number | null; registered: number }[] = [];
-  for (const ev of events) {
-    const { count: registered } = await supabase
+  // Two grouped queries instead of 1 + N-per-event count queries.
+  const [totalRegsRes, activeRegsRes] = await Promise.all([
+    supabase
       .from('registrations')
       .select('id', { count: 'exact', head: true })
-      .eq('event_id', ev.id)
-      .in('status', ['approved', 'confirmed', 'pending', 'waitlisted']);
-    capacity_overview.push({
-      event_id: ev.id,
-      title: ev.title,
-      capacity: ev.capacity,
-      registered: registered ?? 0,
-    });
+      .in('event_id', eventIds),
+    supabase
+      .from('registrations')
+      .select('event_id')
+      .in('event_id', eventIds)
+      .in('status', ['approved', 'confirmed', 'pending', 'waitlisted']),
+  ]);
+
+  const total_registrations = totalRegsRes.count ?? 0;
+
+  const registeredByEvent = new Map<string, number>();
+  for (const row of activeRegsRes.data ?? []) {
+    registeredByEvent.set(row.event_id, (registeredByEvent.get(row.event_id) ?? 0) + 1);
   }
+
+  const capacity_overview = events.map((ev) => ({
+    event_id: ev.id,
+    title: ev.title,
+    capacity: ev.capacity,
+    registered: registeredByEvent.get(ev.id) ?? 0,
+  }));
 
   return {
     upcoming_events,

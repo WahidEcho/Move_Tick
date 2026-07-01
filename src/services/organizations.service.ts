@@ -66,7 +66,7 @@ export type OrganizationWithCounts = Organization & {
   events_count: number;
 };
 
-export interface GetOrganizationsForAdminFilters extends GetOrganizationsFilters {}
+export type GetOrganizationsForAdminFilters = GetOrganizationsFilters;
 
 export async function getOrganizations(
   filters: GetOrganizationsFilters = {}

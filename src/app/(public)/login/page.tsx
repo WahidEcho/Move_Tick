@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createClient } from '@/lib/supabase-browser';
 import { loginSchema, type LoginInput } from '@/lib/validations';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,9 +15,42 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/forms/form-field';
 import { Loader2 } from 'lucide-react';
 
+/** Failsafe: reject if the auth call hangs so the button never stays frozen. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), ms)
+    ),
+  ]);
+}
+
+/**
+ * Where a user lands when they didn't ask for a specific page:
+ * platform admin → /admin, org member → /organizer/overview, else /dashboard.
+ * Any lookup failure falls back to /dashboard — never blocks login.
+ */
+async function resolveRoleDestination(supabase: SupabaseClient): Promise<string> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return '/dashboard';
+
+    const [profileRes, memberRes] = await Promise.all([
+      supabase.from('profiles').select('platform_role').eq('id', user.id).single(),
+      supabase.from('organization_members').select('id').eq('user_id', user.id).limit(1),
+    ]);
+
+    if (profileRes.data?.platform_role === 'admin') return '/admin';
+    if ((memberRes.data?.length ?? 0) > 0) return '/organizer/overview';
+  } catch {
+    // fall through to the attendee default
+  }
+  return '/dashboard';
+}
+
 function LoginForm() {
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirect') ?? '/dashboard';
+  const redirectParam = searchParams.get('redirect');
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const form = useForm<LoginInput>({
@@ -31,20 +65,33 @@ function LoginForm() {
     setSubmitError(null);
     const supabase = createClient();
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    });
+    try {
+      const { error } = await withTimeout(
+        supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        }),
+        15_000
+      );
 
-    if (error) {
-      setSubmitError(error.message);
-      return;
+      if (error) {
+        setSubmitError(error.message);
+        return;
+      }
+
+      // Honor an explicit ?redirect= (from a protected page or an event
+      // registration); otherwise send the user to their role's home.
+      const destination = redirectParam ?? (await resolveRoleDestination(supabase));
+
+      // Hard navigation: guarantees the server picks up the new auth cookie and
+      // redirects reliably. (router.push + router.refresh raced and left the user
+      // authenticated but stuck on /login.)
+      window.location.assign(destination);
+    } catch {
+      setSubmitError(
+        'Signing in is taking too long. Check your connection and try again.'
+      );
     }
-
-    // Hard navigation: guarantees the server picks up the new auth cookie and
-    // redirects reliably. (router.push + router.refresh raced and left the user
-    // authenticated but stuck on /login.)
-    window.location.assign(redirectTo);
   };
 
   return (
