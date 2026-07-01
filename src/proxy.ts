@@ -27,6 +27,20 @@ function isPublicRoute(pathname: string): boolean {
   return false;
 }
 
+/**
+ * Only known app areas require auth. Anything else (a typo'd or dead link)
+ * falls through so Next.js renders the custom 404 instead of bouncing
+ * visitors to /login for pages that don't exist.
+ */
+function isProtectedRoute(pathname: string): boolean {
+  return (
+    ATTENDEE_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`)) ||
+    ORGANIZER_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`)) ||
+    ADMIN_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`)) ||
+    pathname.startsWith('/api')
+  );
+}
+
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -54,7 +68,7 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   const pathname = request.nextUrl.pathname;
 
-  if (isPublicRoute(pathname)) {
+  if (isPublicRoute(pathname) || !isProtectedRoute(pathname)) {
     return supabaseResponse;
   }
 

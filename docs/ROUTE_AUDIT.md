@@ -48,5 +48,6 @@ Access levels: **P** Public · **A** Authenticated attendee · **O** Organizer (
 | slow navigation | P | Spinner | ✅ | **New** `app/loading.tsx` |
 
 ## Direct-link behavior
-- Logged-out hit on any protected route → `/login?redirect=<path>`, and login returns to it (verified).
+- Logged-out hit on a protected route → `/login?redirect=<path>`, and login returns to it (verified).
+- Unknown URLs render the custom 404 instead of bouncing to login — the proxy now only auth-gates known app areas (`/dashboard`, `/tickets`, `/invitations`, `/profile`, `/organizer`, `/admin`, `/api`); dead links fall through to `not-found.tsx` (verified).
 - Non-admin on `/admin/*`, non-member on `/organizer/*` → redirected to `/` by `src/proxy.ts` (unchanged, verified in prior round).
