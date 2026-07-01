@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createClient } from '@/lib/supabase-browser';
@@ -16,7 +15,6 @@ import { FormField } from '@/components/forms/form-field';
 import { Loader2 } from 'lucide-react';
 
 export default function SignupPage() {
-  const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const extendedSchema = signupSchema.extend({
@@ -57,8 +55,8 @@ export default function SignupPage() {
 
     // The profile row (with full_name + default 'attendee' role) is created
     // server-side by the handle_new_user trigger — no client DB write needed.
-    router.push('/dashboard');
-    router.refresh();
+    // Hard navigation so the server picks up the new session cookie reliably.
+    window.location.assign('/dashboard');
   };
 
   return (

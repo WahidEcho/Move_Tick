@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createClient } from '@/lib/supabase-browser';
@@ -15,7 +15,6 @@ import { FormField } from '@/components/forms/form-field';
 import { Loader2 } from 'lucide-react';
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') ?? '/dashboard';
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -42,8 +41,10 @@ function LoginForm() {
       return;
     }
 
-    router.push(redirectTo);
-    router.refresh();
+    // Hard navigation: guarantees the server picks up the new auth cookie and
+    // redirects reliably. (router.push + router.refresh raced and left the user
+    // authenticated but stuck on /login.)
+    window.location.assign(redirectTo);
   };
 
   return (
