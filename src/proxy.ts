@@ -24,6 +24,7 @@ function isPublicRoute(pathname: string): boolean {
   if (pathname.startsWith('/events/')) return true;
   if (pathname.startsWith('/api/auth')) return true;
   if (pathname.startsWith('/api/webhooks')) return true; // provider webhooks self-authenticate (signature)
+  if (pathname.startsWith('/api/mobile')) return true; // mobile app self-authenticates (Bearer token)
   return false;
 }
 

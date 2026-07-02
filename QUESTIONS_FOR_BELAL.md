@@ -1,5 +1,10 @@
 # Questions / Actions for Belal & Mohamed — 2026-07-02
 
+> **Status update (later same day):** Mohamed confirmed all three items.
+> #1 and #2 were applied in the dashboards; #3 was answered "B" and the
+> guest-mode + in-app registration work is **built** (see
+> `docs/MOBILE_STATUS_AND_PLAN.md`). Kept below for the record.
+
 Only items that need dashboard access or a business decision. Everything else
 from the audit brief was fixed directly (see `docs/QA_REPORT.md`).
 

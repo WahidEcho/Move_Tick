@@ -33,6 +33,25 @@ export async function registerForEvent(
   const enableWaitlist = settings?.enable_waitlist ?? false;
   const capacity = event.capacity ?? null;
 
+  // Guard: this action only issues FREE tickets. Without this check a crafted
+  // request could register a paid ticket type at no cost (the paid path must
+  // go through XPay checkout).
+  const { data: ticketType } = await supabase
+    .from('ticket_types')
+    .select('price, event_id, is_active')
+    .eq('id', ticketTypeId)
+    .single();
+
+  if (!ticketType || ticketType.event_id !== eventId || !ticketType.is_active) {
+    return { success: false, message: 'Invalid ticket type' };
+  }
+  if (Number(ticketType.price) > 0) {
+    return {
+      success: false,
+      message: 'This ticket type requires payment — please use the Buy option.',
+    };
+  }
+
   // Check ticket type availability
   const available = await ticketsService.getTicketTypeAvailability(ticketTypeId);
   if (available <= 0) {
