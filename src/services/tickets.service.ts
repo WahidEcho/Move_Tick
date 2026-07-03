@@ -148,6 +148,50 @@ export async function issueTicket(
   return ticket as Ticket;
 }
 
+export interface GuestTicketInfo {
+  email: string;
+  name?: string | null;
+  invitationId?: string | null;
+}
+
+/**
+ * Issue a ticket to a guest who has NOT signed up (admin invitation flow).
+ * Mirrors issueTicket() but stores guest identity instead of a profile id, via
+ * the atomic issue_guest_ticket() RPC. The QR still scans normally at the gate.
+ */
+export async function issueGuestTicket(
+  eventId: string,
+  ticketTypeId: string,
+  guest: GuestTicketInfo
+): Promise<Ticket> {
+  const supabase = createServiceClient();
+
+  const token = generateToken(24);
+  const qrCode = await QRCode.toDataURL(token);
+
+  const { data: ticket, error } = await supabase.rpc('issue_guest_ticket', {
+    p_event_id: eventId,
+    p_ticket_type_id: ticketTypeId,
+    p_guest_email: guest.email,
+    p_guest_name: guest.name ?? null,
+    p_invitation_id: guest.invitationId ?? null,
+    p_qr_token: token,
+    p_qr_code: qrCode,
+  });
+
+  if (error) {
+    if (error.message.includes('TICKET_TYPE_SOLD_OUT')) {
+      throw new Error('Ticket type is sold out');
+    }
+    if (error.message.includes('TICKET_TYPE_NOT_FOUND')) {
+      throw new Error('Ticket type not found');
+    }
+    throw new Error(`Failed to issue guest ticket: ${error.message}`);
+  }
+
+  return ticket as Ticket;
+}
+
 export async function getTicket(id: string): Promise<TicketWithJoins | null> {
   const supabase = createServiceClient();
 

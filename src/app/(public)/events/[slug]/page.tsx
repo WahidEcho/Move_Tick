@@ -18,6 +18,7 @@ import {
 import { format } from 'date-fns';
 import { RegisterDialog } from './register-dialog';
 import { isOptimizableImage } from '../event-card';
+import { formatEgp } from '@/lib/helpers';
 
 interface EventPageProps {
   params: Promise<{ slug: string }>;
@@ -214,7 +215,7 @@ export default async function EventPage({ params }: EventPageProps) {
                               )}
                             </div>
                             <span className="shrink-0 font-semibold">
-                              {tt.price === 0 ? 'Free' : `$${tt.price}`}
+                              {formatEgp(tt.price)}
                             </span>
                           </div>
                           {tt.capacity != null && (

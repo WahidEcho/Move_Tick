@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { getActiveOrganizerOrg } from '@/lib/auth';
+import { redirect } from 'next/navigation';
+import { getOrganizerContext } from '@/lib/auth';
 import { getOrganizerDashboardSummary } from '@/services/analytics.service';
 import { getOrganizationEvents } from '@/services/events.service';
 import { StatCard } from '@/components/layout/stat-card';
@@ -17,7 +18,10 @@ import {
 } from 'lucide-react';
 
 export default async function OrganizerOverviewPage() {
-  const { org } = await getActiveOrganizerOrg();
+  const { org } = await getOrganizerContext();
+  // Assignment-only co-organizers have no org dashboard; send them to their events.
+  if (!org) redirect('/organizer/events');
+
   const [summary, recentEventsResult] = await Promise.all([
     getOrganizerDashboardSummary(org.id),
     getOrganizationEvents(org.id, { page_size: 5 }),

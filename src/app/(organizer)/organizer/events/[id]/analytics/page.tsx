@@ -1,6 +1,4 @@
-import { notFound } from 'next/navigation';
-import { getActiveOrganizerOrg } from '@/lib/auth';
-import { getEvent } from '@/services/events.service';
+import { requireEventAccess } from '@/lib/auth';
 import {
   getEventAnalytics,
   getRegistrationTrend,
@@ -28,13 +26,9 @@ export default async function EventAnalyticsPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { org } = await getActiveOrganizerOrg();
   const { id: eventId } = await params;
 
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
-    notFound();
-  }
+  await requireEventAccess(eventId);
 
   const [analytics, registrationTrend, attendanceTrend] = await Promise.all([
     getEventAnalytics(eventId),

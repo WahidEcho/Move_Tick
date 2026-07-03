@@ -11,6 +11,7 @@ import { Plus, Edit, Trash2, Ticket } from 'lucide-react';
 import { ConfirmDialog } from '@/components/layout/confirm-dialog';
 import { TicketTypeForm } from './ticket-type-form';
 import { deleteTicketTypeAction } from './actions';
+import { formatEgp } from '@/lib/helpers';
 
 interface TicketsClientProps {
   eventId: string;
@@ -90,7 +91,7 @@ export function TicketsClient({
               <CardContent className="space-y-2">
                 <div className="flex justify-between text-sm text-muted-foreground">
                   <span>Price</span>
-                  <span>${(tt.price ?? 0).toFixed(2)}</span>
+                  <span>{formatEgp(tt.price, { freeLabel: null })}</span>
                 </div>
                 <div className="flex justify-between text-sm text-muted-foreground">
                   <span>Sold</span>

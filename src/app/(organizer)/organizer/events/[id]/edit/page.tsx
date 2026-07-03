@@ -16,6 +16,7 @@ import { EVENT_CATEGORIES } from '@/lib/constants';
 import { generateSlug } from '@/lib/helpers';
 import { FormField } from '@/components/forms/form-field';
 import { FormSelect } from '@/components/forms/form-select';
+import { ImageUpload } from '@/components/forms/image-upload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -335,11 +336,17 @@ export default function EditEventPage() {
               </CardHeader>
               <CardContent>
                 <FormField
-                  label="Cover Image URL"
+                  label="Cover Image"
                   name="cover_image_url"
                   error={eventForm.formState.errors.cover_image_url?.message}
                 >
-                  <Input {...eventForm.register('cover_image_url')} placeholder="https://..." type="url" />
+                  <ImageUpload
+                    orgId={event.organization_id}
+                    value={eventForm.watch('cover_image_url')}
+                    onChange={(url) =>
+                      eventForm.setValue('cover_image_url', url, { shouldDirty: true })
+                    }
+                  />
                 </FormField>
               </CardContent>
             </Card>

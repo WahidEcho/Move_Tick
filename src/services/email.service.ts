@@ -1,6 +1,7 @@
 import { createServiceClient } from '@/lib/supabase-server';
 import { sendEmail, dataUrlToBase64, type SendEmailResult } from '@/lib/email';
-import { ticketIssuedEmail, invitationEmail } from '@/lib/email-templates';
+import { ticketIssuedEmail, invitationEmail, staffAssignmentEmail } from '@/lib/email-templates';
+import type { EventStaffRole } from '@/types/database.types';
 import { walletAvailability } from '@/lib/wallet/config';
 import { getAppUrl as appUrl } from '@/lib/app-url';
 import { generateTicketPdf } from '@/lib/ticket-pdf';
@@ -36,7 +37,13 @@ export async function sendTicketEmail(ticketId: string): Promise<SendEmailResult
   const event = ticket.event as { title?: string; start_date?: string; venue?: string; city?: string } | null;
   const ticketType = ticket.ticket_type as { name?: string } | null;
 
-  const to = profile?.email;
+  // Guest tickets (admin invitations, no account) carry their identity on the
+  // ticket row itself; fall back to that when there's no linked profile.
+  const guestEmail = ticket.guest_email as string | null;
+  const guestName = ticket.guest_name as string | null;
+  const recipientName = profile?.full_name || guestName || 'there';
+
+  const to = profile?.email || guestEmail;
   if (!to) {
     return { ok: false, error: 'attendee_has_no_email' };
   }
@@ -47,7 +54,7 @@ export async function sendTicketEmail(ticketId: string): Promise<SendEmailResult
 
   const wallet = walletAvailability();
   const { subject, html } = ticketIssuedEmail({
-    attendeeName: profile?.full_name || 'there',
+    attendeeName: recipientName,
     eventTitle: event?.title || 'your event',
     eventDateLabel: dateLabel,
     venue: event?.venue,
@@ -67,9 +74,9 @@ export async function sendTicketEmail(ticketId: string): Promise<SendEmailResult
         dateLabel,
         venue: event?.venue,
         city: event?.city,
-        ticketTypeName: ticketType?.name || 'Ticket',
-        attendeeName: profile?.full_name || 'Guest',
-        qrPngDataUrl: qrDataUrl,
+          ticketTypeName: ticketType?.name || 'Ticket',
+          attendeeName: recipientName === 'there' ? 'Guest' : recipientName,
+          qrPngDataUrl: qrDataUrl,
       });
       attachments = [
         { filename: 'ticket.pdf', content: Buffer.from(pdfBytes).toString('base64') },
@@ -119,4 +126,51 @@ export async function sendInvitationEmail(invitationId: string): Promise<SendEma
   });
 
   return sendEmail({ to, subject, html });
+}
+
+const STAFF_ROLE_LABELS: Record<EventStaffRole, string> = {
+  event_manager: 'Event Manager',
+  gate_scanner: 'Gate Scanner',
+  space_controller: 'Space Controller',
+  redeemer: 'Redeemer',
+  support_staff: 'Support Staff',
+};
+
+/**
+ * Notify a co-organizer that they've been assigned to an event, with a direct
+ * link to manage it in the organizer portal. `needsSignup` tells the invitee to
+ * create an account with this email first when they don't have one yet.
+ */
+export async function sendStaffAssignmentEmail(params: {
+  eventId: string;
+  toEmail: string;
+  assigneeName?: string | null;
+  role: EventStaffRole;
+  needsSignup: boolean;
+}): Promise<SendEmailResult> {
+  const supabase = createServiceClient();
+
+  const { data: event } = await supabase
+    .from('events')
+    .select('title, start_date, organization:organizations(name)')
+    .eq('id', params.eventId)
+    .single();
+
+  const dateLabel = event?.start_date
+    ? format(new Date(event.start_date), "EEE, MMM d, yyyy · h:mm a")
+    : null;
+  const orgName = (event?.organization as { name?: string } | null)?.name ?? null;
+
+  const { subject, html } = staffAssignmentEmail({
+    assigneeName: params.assigneeName ?? null,
+    eventTitle: event?.title || 'an event',
+    organizationName: orgName,
+    roleLabel: STAFF_ROLE_LABELS[params.role] ?? params.role,
+    eventDateLabel: dateLabel,
+    manageUrl: `${appUrl()}/organizer/events/${params.eventId}`,
+    needsSignup: params.needsSignup,
+    inviteeEmail: params.toEmail,
+  });
+
+  return sendEmail({ to: params.toEmail, subject, html });
 }

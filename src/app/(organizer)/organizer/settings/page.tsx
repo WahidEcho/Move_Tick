@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { FormField } from '@/components/forms/form-field';
+import { ImageUpload } from '@/components/forms/image-upload';
 import type { Organization } from '@/types/database.types';
 
 interface OrgFormData {
@@ -29,7 +30,7 @@ export default function OrganizerSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<OrgFormData>({
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<OrgFormData>({
     defaultValues: {
       name: '',
       description: '',
@@ -158,11 +159,11 @@ export default function OrganizerSettingsPage() {
               </FormField>
             </div>
 
-            <FormField label="Logo URL" name="logo_url" error={errors.logo_url?.message}>
-              <Input
-                {...register('logo_url')}
-                placeholder="https://..."
-                type="url"
+            <FormField label="Logo" name="logo_url" error={errors.logo_url?.message}>
+              <ImageUpload
+                orgId={org.id}
+                value={watch('logo_url')}
+                onChange={(url) => setValue('logo_url', url, { shouldDirty: true })}
               />
             </FormField>
 

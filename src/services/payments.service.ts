@@ -1,5 +1,5 @@
 import { createServiceClient } from '@/lib/supabase-server';
-import { createCheckoutSession, createRefund } from '@/lib/xpay/client';
+import { createCheckoutSession, createRefund, retrieveCheckoutSession } from '@/lib/xpay/client';
 import { validateCoupon } from './coupons.service';
 import * as ticketsService from './tickets.service';
 import { sendTicketEmail } from './email.service';
@@ -188,6 +188,68 @@ export async function fulfillCheckoutCompleted(session: {
     await supabase.from('payments').update({ status: 'pending' }).eq('id', claimed.id);
     throw e;
   }
+}
+
+export type ReconcileStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled' | 'unknown';
+
+/**
+ * Reconcile a pending payment against XPay directly (webhook-independent).
+ *
+ * The confirmation page calls this so a buyer is never stuck on "Confirming…"
+ * when the webhook is delayed or misconfigured. If the XPay session is
+ * `complete` we fulfill (idempotently — the atomic claim in
+ * fulfillCheckoutCompleted guarantees no double issuance even if the webhook
+ * also fires); if it has `expired`, we mark the payment failed. Only the owner
+ * may reconcile their own payment.
+ */
+export async function reconcilePaymentStatus(
+  paymentId: string,
+  userId: string
+): Promise<ReconcileStatus> {
+  const supabase = createServiceClient();
+
+  const { data: payment } = await supabase
+    .from('payments')
+    .select('status, user_id, xpay_session_id')
+    .eq('id', paymentId)
+    .maybeSingle();
+
+  if (!payment || payment.user_id !== userId) return 'unknown';
+
+  const current = payment.status as ReconcileStatus;
+  if (current !== 'pending') return current;
+
+  const sessionId = payment.xpay_session_id as string | null;
+  if (!sessionId) return 'pending';
+
+  let session: Awaited<ReturnType<typeof retrieveCheckoutSession>> = null;
+  try {
+    session = await retrieveCheckoutSession(sessionId);
+  } catch {
+    return 'pending'; // config/transient issue — keep waiting
+  }
+  if (!session) return 'pending';
+
+  if (session.status === 'complete') {
+    try {
+      await fulfillCheckoutCompleted({ id: session.id, paymentIntent: session.paymentIntent });
+    } catch (e) {
+      console.warn(`[xpay] reconcile fulfillment failed for ${paymentId}:`, e);
+      return 'pending'; // will retry on next poll / webhook
+    }
+    return 'paid';
+  }
+
+  if (session.status === 'expired') {
+    await supabase
+      .from('payments')
+      .update({ status: 'failed' })
+      .eq('id', paymentId)
+      .eq('status', 'pending');
+    return 'failed';
+  }
+
+  return 'pending';
 }
 
 /** Refund a paid payment via XPay and mark it refunded. */

@@ -1,6 +1,4 @@
-import { notFound } from 'next/navigation';
-import { getActiveOrganizerOrg } from '@/lib/auth';
-import { getEvent } from '@/services/events.service';
+import { requireEventAccess } from '@/lib/auth';
 import { EventTabs } from './event-tabs';
 
 export default async function EventManagementLayout({
@@ -10,13 +8,8 @@ export default async function EventManagementLayout({
   children: React.ReactNode;
   params: Promise<{ id: string }>;
 }) {
-  const { org } = await getActiveOrganizerOrg();
   const { id } = await params;
-  const event = await getEvent(id);
-
-  if (!event || event.organization_id !== org.id) {
-    notFound();
-  }
+  const { event } = await requireEventAccess(id);
 
   return (
     <div className="space-y-6">

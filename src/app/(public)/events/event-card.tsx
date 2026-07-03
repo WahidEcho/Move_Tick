@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar, MapPin, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import type { EventWithDetails } from '@/services/events.service';
+import { isOptimizableImage } from '@/lib/helpers';
 
 interface EventCardProps {
   event: EventWithDetails;
@@ -13,19 +14,8 @@ interface EventCardProps {
   confirmedCount: number;
 }
 
-/**
- * Cover URLs are organizer-provided free text. Only Supabase Storage images go
- * through the optimizer (matches next.config remotePatterns); any other host is
- * served as-is so arbitrary URLs don't crash next/image.
- */
-export function isOptimizableImage(url: string): boolean {
-  try {
-    const { hostname, pathname } = new URL(url);
-    return hostname.endsWith('.supabase.co') && pathname.startsWith('/storage/v1/object/public/');
-  } catch {
-    return false;
-  }
-}
+// Re-exported for existing import sites (moved to lib/helpers for client reuse).
+export { isOptimizableImage };
 
 export function EventCard({ event, confirmedCount }: EventCardProps) {
   const capacity = event.capacity ?? null;

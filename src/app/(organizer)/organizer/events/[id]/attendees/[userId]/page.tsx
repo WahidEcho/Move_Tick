@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { getActiveOrganizerOrg } from '@/lib/auth';
-import { getEvent } from '@/services/events.service';
+import { requireEventAccess } from '@/lib/auth';
 import { getAttendeeDetails } from '@/services/attendees.service';
 import { getEventSpaces } from '@/services/spaces.service';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,13 +22,9 @@ interface AttendeeDetailPageProps {
 export default async function AttendeeDetailPage({
   params,
 }: AttendeeDetailPageProps) {
-  const { org } = await getActiveOrganizerOrg();
   const { id: eventId, userId } = await params;
 
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
-    notFound();
-  }
+  await requireEventAccess(eventId);
 
   const [attendee, spaces] = await Promise.all([
     getAttendeeDetails(eventId, userId),

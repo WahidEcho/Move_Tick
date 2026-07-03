@@ -125,17 +125,23 @@ export function TicketTypeForm({
             />
           </FormField>
           <FormField
-            label="Price"
+            label="Price (EGP)"
             name="price"
             error={form.formState.errors.price?.message}
           >
-            <Input
-              type="number"
-              min={0}
-              step={0.01}
-              {...form.register('price', { valueAsNumber: true })}
-              placeholder="0"
-            />
+            <div className="relative">
+              <Input
+                type="number"
+                min={0}
+                step={0.01}
+                {...form.register('price', { valueAsNumber: true })}
+                placeholder="0"
+                className="pr-12"
+              />
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
+                EGP
+              </span>
+            </div>
           </FormField>
           <FormField
             label="Capacity"

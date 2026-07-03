@@ -1,6 +1,4 @@
-import { notFound } from 'next/navigation';
-import { getActiveOrganizerOrg } from '@/lib/auth';
-import { getEvent } from '@/services/events.service';
+import { requireEventAccess } from '@/lib/auth';
 import {
   getEventRedeemItems,
   getEventRedeemMappings,
@@ -14,13 +12,9 @@ export default async function RedeemsPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { org } = await getActiveOrganizerOrg();
   const { id: eventId } = await params;
 
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
-    notFound();
-  }
+  await requireEventAccess(eventId);
 
   const [redeemItems, ticketTypes, mappings, redeemSummary] = await Promise.all([
     getEventRedeemItems(eventId),

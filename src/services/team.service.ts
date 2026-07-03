@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase-server';
+import { sendStaffAssignmentEmail } from './email.service';
 import type {
   Profile,
   EventStaffAssignment,
@@ -41,7 +42,9 @@ export async function assignEventStaff(
 
   const profile = await findUserByEmail(userEmail);
   if (!profile) {
-    throw new Error(`User not found with email: ${userEmail}`);
+    throw new Error(
+      `No account exists for ${userEmail}. Ask them to sign up with this email first, then assign them.`
+    );
   }
 
   const { data, error } = await supabase
@@ -58,6 +61,20 @@ export async function assignEventStaff(
     .single();
 
   if (error) throw new Error(`Failed to assign event staff: ${error.message}`);
+
+  // Best-effort: email the co-organizer a direct link to manage the event.
+  try {
+    await sendStaffAssignmentEmail({
+      eventId,
+      toEmail: profile.email,
+      assigneeName: profile.full_name,
+      role,
+      needsSignup: false,
+    });
+  } catch (e) {
+    console.warn(`[team] assignment email failed for ${userEmail}:`, e);
+  }
+
   return data as EventStaffAssignment;
 }
 

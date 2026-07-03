@@ -58,6 +58,33 @@ export function formatNumber(num: number): string {
   return num.toString();
 }
 
+/**
+ * Cover URLs may be organizer-provided free text. Only Supabase Storage images
+ * go through next/image optimization (matches next.config remotePatterns); any
+ * other host is served as-is so arbitrary URLs don't crash next/image.
+ */
+export function isOptimizableImage(url: string): boolean {
+  try {
+    const { hostname, pathname } = new URL(url);
+    return hostname.endsWith('.supabase.co') && pathname.startsWith('/storage/v1/object/public/');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Format a ticket price (major EGP units) for display. Prices in this platform
+ * are always Egyptian pounds. Pass `freeLabel` to control how 0 renders.
+ */
+export function formatEgp(
+  amount: number | null | undefined,
+  { freeLabel = 'Free', decimals = 2 }: { freeLabel?: string | null; decimals?: number } = {}
+): string {
+  const value = Number(amount ?? 0);
+  if (value === 0 && freeLabel !== null) return freeLabel;
+  return `${value.toFixed(decimals)} EGP`;
+}
+
 export function getInitials(name: string): string {
   return name
     .split(' ')

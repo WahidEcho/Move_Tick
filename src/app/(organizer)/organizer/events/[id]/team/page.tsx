@@ -1,6 +1,4 @@
-import { notFound } from 'next/navigation';
-import { getActiveOrganizerOrg } from '@/lib/auth';
-import { getEvent } from '@/services/events.service';
+import { requireEventAccess } from '@/lib/auth';
 import { getEventStaff } from '@/services/team.service';
 import { getEventSpaces } from '@/services/spaces.service';
 import { TeamClient } from './team-client';
@@ -10,13 +8,8 @@ export default async function EventTeamPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { org } = await getActiveOrganizerOrg();
   const { id: eventId } = await params;
-
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
-    notFound();
-  }
+  await requireEventAccess(eventId);
 
   const [staff, spaces] = await Promise.all([
     getEventStaff(eventId),

@@ -143,7 +143,10 @@ export interface Ticket {
   id: string;
   event_id: string;
   ticket_type_id: string;
-  user_id: string;
+  user_id: string | null;
+  guest_email: string | null;
+  guest_name: string | null;
+  invitation_id: string | null;
   qr_code: string | null;
   qr_token: string | null;
   is_active: boolean;

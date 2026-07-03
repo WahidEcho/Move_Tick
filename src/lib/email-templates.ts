@@ -92,6 +92,51 @@ export function invitationEmail(data: InvitationEmailData): RenderedEmail {
   return { subject: `You're invited: ${data.eventTitle}`, html: shell(inner) };
 }
 
+export interface StaffAssignmentEmailData {
+  assigneeName?: string | null;
+  eventTitle: string;
+  organizationName?: string | null;
+  roleLabel: string;
+  eventDateLabel?: string | null;
+  /** Direct link into the organizer portal for this event. */
+  manageUrl: string;
+  /** True when the invitee has no account yet and must sign up with this email first. */
+  needsSignup: boolean;
+  inviteeEmail: string;
+}
+
+/** Co-organizer assignment email: role + a direct link to manage the event. */
+export function staffAssignmentEmail(data: StaffAssignmentEmailData): RenderedEmail {
+  const greeting = data.assigneeName ? `Hi ${escapeHtml(data.assigneeName)},` : 'Hi,';
+  const orgLine = data.organizationName
+    ? ` by <strong>${escapeHtml(data.organizationName)}</strong>`
+    : '';
+  const signupNote = data.needsSignup
+    ? `<p style="margin:0 0 20px 0;color:#374151;font-size:14px;line-height:1.6;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px;">
+         To access it, first create a free account using this email address
+         (<strong>${escapeHtml(data.inviteeEmail)}</strong>). Once you're signed in,
+         the button below will take you straight to the event.
+       </p>`
+    : '';
+  const inner = `
+    <tr><td style="padding:32px 32px 8px 32px;">
+      <p style="margin:0 0 4px 0;color:${BRAND_PURPLE};font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">You've been added as a co-organizer</p>
+      <h1 style="margin:0 0 16px 0;color:${NEAR_BLACK};font-size:24px;line-height:1.25;">${escapeHtml(data.eventTitle)}</h1>
+      <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:1.6;">
+        ${greeting} you've been assigned as <strong>${escapeHtml(data.roleLabel)}</strong> for
+        <strong>${escapeHtml(data.eventTitle)}</strong>${orgLine}.
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px 0;">
+        ${data.eventDateLabel ? `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">📅 ${escapeHtml(data.eventDateLabel)}</td></tr>` : ''}
+      </table>
+      ${signupNote}
+      <div style="text-align:center;margin:0 0 8px 0;">
+        ${button(data.manageUrl, 'Open event dashboard')}
+      </div>
+    </td></tr>`;
+  return { subject: `You're a co-organizer for ${data.eventTitle}`, html: shell(inner) };
+}
+
 /** Email confirming an issued ticket, with a link to the wallet + QR attached. */
 export function ticketIssuedEmail(data: TicketEmailData): RenderedEmail {
   const locationLine = [data.venue, data.city]

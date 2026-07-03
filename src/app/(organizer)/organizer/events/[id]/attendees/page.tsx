@@ -1,6 +1,4 @@
-import { notFound } from 'next/navigation';
-import { getActiveOrganizerOrg } from '@/lib/auth';
-import { getEvent } from '@/services/events.service';
+import { requireEventAccess } from '@/lib/auth';
 import { getEventAttendees } from '@/services/attendees.service';
 import { getEventAnalytics } from '@/services/analytics.service';
 import { StatCard } from '@/components/layout/stat-card';
@@ -40,14 +38,10 @@ export default async function AttendeesPage({
   params,
   searchParams,
 }: AttendeesPageProps) {
-  const { org } = await getActiveOrganizerOrg();
   const { id: eventId } = await params;
   const { status, presence, search, page } = await searchParams;
 
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
-    notFound();
-  }
+  await requireEventAccess(eventId);
 
   const [attendeesResult, analytics] = await Promise.all([
     getEventAttendees(eventId, {

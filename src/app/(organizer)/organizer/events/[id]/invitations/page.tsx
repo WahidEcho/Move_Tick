@@ -1,6 +1,4 @@
-import { notFound } from 'next/navigation';
-import { getActiveOrganizerOrg } from '@/lib/auth';
-import { getEvent } from '@/services/events.service';
+import { requireEventAccess } from '@/lib/auth';
 import { getEventInvitations, getInvitationFunnel } from '@/services/invitations.service';
 import { FunnelChart } from '@/components/charts/funnel-chart';
 import { StatCard } from '@/components/layout/stat-card';
@@ -34,14 +32,10 @@ export default async function InvitationsPage({
   params,
   searchParams,
 }: InvitationsPageProps) {
-  const { org } = await getActiveOrganizerOrg();
   const { id: eventId } = await params;
   const { status, search, page } = await searchParams;
 
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
-    notFound();
-  }
+  const { event } = await requireEventAccess(eventId);
 
   const [invitationsResult, funnel, allInvitationsForEmails] = await Promise.all([
     getEventInvitations(eventId, {
@@ -81,7 +75,7 @@ export default async function InvitationsPage({
         <h2 className="text-lg font-semibold">Invitations</h2>
         <InvitationsActionsBar
           eventId={eventId}
-          orgId={org.id}
+          orgId={event.organization_id}
           existingEmails={existingEmails}
           csvTemplateHeaders={CSV_TEMPLATE_HEADERS}
           failedCount={funnel.failed}

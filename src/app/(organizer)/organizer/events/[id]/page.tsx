@@ -1,7 +1,6 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
-import { getActiveOrganizerOrg } from '@/lib/auth';
-import { getEvent, getEventStats } from '@/services/events.service';
+import { requireEventAccess } from '@/lib/auth';
+import { getEventStats } from '@/services/events.service';
 import { getEventAnalytics } from '@/services/analytics.service';
 import { StatCard } from '@/components/layout/stat-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,13 +47,8 @@ export default async function EventManagementPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { org } = await getActiveOrganizerOrg();
   const { id } = await params;
-  const event = await getEvent(id);
-
-  if (!event || event.organization_id !== org.id) {
-    notFound();
-  }
+  const { event } = await requireEventAccess(id);
 
   const [stats, analytics] = await Promise.all([
     getEventStats(id),

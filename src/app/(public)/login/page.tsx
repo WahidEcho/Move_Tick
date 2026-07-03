@@ -35,13 +35,21 @@ async function resolveRoleDestination(supabase: SupabaseClient): Promise<string>
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return '/dashboard';
 
-    const [profileRes, memberRes] = await Promise.all([
+    const [profileRes, memberRes, staffRes] = await Promise.all([
       supabase.from('profiles').select('platform_role').eq('id', user.id).single(),
       supabase.from('organization_members').select('id').eq('user_id', user.id).limit(1),
+      supabase
+        .from('event_staff_assignments')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .limit(1),
     ]);
 
     if (profileRes.data?.platform_role === 'admin') return '/admin';
     if ((memberRes.data?.length ?? 0) > 0) return '/organizer/overview';
+    // Assigned co-organizers (no org of their own) land on their shared events.
+    if ((staffRes.data?.length ?? 0) > 0) return '/organizer/events';
   } catch {
     // fall through to the attendee default
   }

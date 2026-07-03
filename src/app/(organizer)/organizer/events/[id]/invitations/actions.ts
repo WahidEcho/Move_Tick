@@ -99,7 +99,7 @@ export async function resendInvitation(
   eventId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await invitationsService.updateInvitationStatus(invitationId, 'pending');
+    await invitationsService.resendInvitation(invitationId);
     revalidatePath(`/organizer/events/${eventId}/invitations`);
     revalidatePath(`/organizer/events/${eventId}`);
     return { success: true };

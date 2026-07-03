@@ -1,6 +1,4 @@
-import { notFound } from 'next/navigation';
-import { getActiveOrganizerOrg } from '@/lib/auth';
-import { getEvent } from '@/services/events.service';
+import { requireEventAccess } from '@/lib/auth';
 import { getEventCoupons } from '@/services/coupons.service';
 import { CouponsClient } from './coupons-client';
 
@@ -9,13 +7,8 @@ export default async function CouponsPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { org } = await getActiveOrganizerOrg();
   const { id: eventId } = await params;
-
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
-    notFound();
-  }
+  await requireEventAccess(eventId);
 
   const coupons = await getEventCoupons(eventId);
 

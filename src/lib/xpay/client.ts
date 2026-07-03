@@ -68,6 +68,38 @@ export async function createCheckoutSession(
   return (await res.json()) as CheckoutSession;
 }
 
+/**
+ * Retrieve a checkout session directly from XPay. Used to reconcile payment
+ * status server-side when the webhook is delayed or never arrives, so the
+ * confirmation page never spins forever. Returns null if the session is not
+ * found (or on transient error) so callers can keep waiting.
+ */
+export async function retrieveCheckoutSession(
+  sessionId: string
+): Promise<{ id: string; status: string; paymentIntent?: { id?: string } | null } | null> {
+  if (!secretKey) throw new Error('xpay_not_configured');
+
+  const res = await fetch(`${XPAY_API_BASE}/checkout/sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${secretKey}`,
+      'Content-Type': 'application/json',
+    },
+    // Never cache a payment status.
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    // 404 or transient upstream error — treat as "not resolvable yet".
+    return null;
+  }
+  return (await res.json()) as {
+    id: string;
+    status: string;
+    paymentIntent?: { id?: string } | null;
+  };
+}
+
 export interface RefundResult {
   id: string;
   status: string;

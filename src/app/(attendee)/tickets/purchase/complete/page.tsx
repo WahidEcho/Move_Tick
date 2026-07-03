@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { requireAuth } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase-server';
+import { reconcilePaymentStatus } from '@/services/payments.service';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
@@ -26,6 +27,11 @@ export default async function PurchaseCompletePage({ searchParams }: PageProps) 
     // Only reveal status to the buyer.
     if (data && data.user_id === profile.id) {
       status = data.status as PayStatus;
+      // Webhook-independent reconciliation: if still pending, ask XPay directly
+      // so the buyer isn't stuck on "Confirming…" when the webhook is delayed.
+      if (status === 'pending') {
+        status = await reconcilePaymentStatus(paymentId, profile.id);
+      }
     }
   }
 

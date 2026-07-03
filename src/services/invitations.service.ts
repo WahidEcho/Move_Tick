@@ -1,25 +1,125 @@
 import { createServiceClient } from '@/lib/supabase-server';
-import { sendInvitationEmail } from './email.service';
+import { sendTicketEmail } from './email.service';
+import { issueGuestTicket, issueTicket, createTicketType } from './tickets.service';
 import type {
   EventInvitation,
   InvitationStatus,
 } from '@/types/database.types';
 import type { PaginatedResult, InvitationFunnel } from '@/types/domain.types';
 
-/** Best-effort: send the invitation email and reflect the outcome in status. */
+const INVITATION_TICKET_TYPE_NAME = 'Invitation';
+
+/**
+ * Resolve the ticket type an invitation should grant. Uses the explicitly
+ * chosen type when present; otherwise finds (or creates) a free, invite-only
+ * "Invitation" ticket type for the event so every guest gets a real ticket.
+ */
+async function resolveInvitationTicketTypeId(
+  eventId: string,
+  explicitTicketTypeId?: string | null
+): Promise<string> {
+  if (explicitTicketTypeId) return explicitTicketTypeId;
+
+  const supabase = createServiceClient();
+  const { data: existing } = await supabase
+    .from('ticket_types')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('name', INVITATION_TICKET_TYPE_NAME)
+    .eq('is_active', true)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (existing?.id) return existing.id as string;
+
+  const created = await createTicketType(eventId, {
+    name: INVITATION_TICKET_TYPE_NAME,
+    description: 'Complimentary ticket issued to invited guests.',
+    price: 0,
+    visibility: 'invite_only',
+  });
+  return created.id;
+}
+
+/**
+ * Admin invitation delivery: issue a real (free) guest ticket and email it — QR
+ * + PDF — directly to the invitee, no signup required. Reflects the outcome on
+ * the invitation status. Idempotent: skips issuance if a ticket already exists
+ * for this invitation.
+ */
 async function deliverInvitation(invitationId: string): Promise<void> {
   const supabase = createServiceClient();
   try {
-    const result = await sendInvitationEmail(invitationId);
+    const { data: inv } = await supabase
+      .from('event_invitations')
+      .select('id, event_id, invitee_email, invitee_name, ticket_type_id')
+      .eq('id', invitationId)
+      .single();
+    if (!inv) return;
+
+    // Idempotency: reuse an existing ticket for this invitation if present.
+    const { data: existingTicket } = await supabase
+      .from('tickets')
+      .select('id')
+      .eq('invitation_id', invitationId)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    let ticketId = existingTicket?.id as string | undefined;
+
+    if (!ticketId) {
+      const ticketTypeId = await resolveInvitationTicketTypeId(
+        inv.event_id as string,
+        inv.ticket_type_id as string | null
+      );
+
+      // If the invitee already has an account, tie the ticket to their profile
+      // so it shows up in "My Tickets"; otherwise issue a no-signup guest ticket.
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', inv.invitee_email as string)
+        .maybeSingle();
+
+      if (profile?.id) {
+        const ticket = await issueTicket(
+          inv.event_id as string,
+          ticketTypeId,
+          profile.id as string
+        );
+        // Tag with the invitation so resends stay idempotent.
+        await supabase
+          .from('tickets')
+          .update({ invitation_id: invitationId })
+          .eq('id', ticket.id);
+        ticketId = ticket.id;
+      } else {
+        const ticket = await issueGuestTicket(inv.event_id as string, ticketTypeId, {
+          email: inv.invitee_email as string,
+          name: inv.invitee_name as string | null,
+          invitationId,
+        });
+        ticketId = ticket.id;
+      }
+    }
+
+    const result = await sendTicketEmail(ticketId);
+
     await supabase
       .from('event_invitations')
       .update({
-        status: result.ok ? 'sent' : 'failed',
+        status: result.ok ? 'accepted' : 'failed',
         sent_at: result.ok ? new Date().toISOString() : null,
+        responded_at: result.ok ? new Date().toISOString() : null,
       })
       .eq('id', invitationId);
   } catch (e) {
     console.warn(`[invitations] delivery failed for ${invitationId}:`, e);
+    await supabase
+      .from('event_invitations')
+      .update({ status: 'failed' })
+      .eq('id', invitationId);
   }
 }
 
@@ -264,7 +364,18 @@ export async function resendInvitations(
   const { data, error } = await query.select('id');
 
   if (error) throw new Error(`Failed to resend invitations: ${error.message}`);
+
+  // Actually re-deliver: re-issue (idempotent) + re-email the ticket.
+  for (const row of data ?? []) {
+    await deliverInvitation((row as { id: string }).id);
+  }
+
   return data?.length ?? 0;
+}
+
+/** Re-deliver a single invitation's ticket email (idempotent). */
+export async function resendInvitation(invitationId: string): Promise<void> {
+  await deliverInvitation(invitationId);
 }
 
 export async function getInvitationFunnel(

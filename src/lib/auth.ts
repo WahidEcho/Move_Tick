@@ -1,6 +1,7 @@
 import { createClient, createServiceClient } from './supabase-server';
-import { redirect } from 'next/navigation';
-import type { Profile, OrgRole, EventStaffRole } from '@/types/database.types';
+import { redirect, notFound } from 'next/navigation';
+import { getEvent, type EventWithDetails } from '@/services/events.service';
+import type { Profile, OrgRole, EventStaffRole, Organization } from '@/types/database.types';
 
 export async function getSession() {
   const supabase = await createClient();
@@ -118,4 +119,118 @@ export async function checkEventStaffRole(
     .in('role', roles);
 
   return (data ?? []).length > 0;
+}
+
+/** The caller's role in an organization, or null if they are not a member. */
+export async function getOrgRole(userId: string, orgId: string): Promise<OrgRole | null> {
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from('organization_members')
+    .select('role')
+    .eq('organization_id', orgId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  return (data?.role as OrgRole) ?? null;
+}
+
+/** The caller's (first) active staff role on an event, or null if unassigned. */
+export async function getEventStaffRole(
+  userId: string,
+  eventId: string
+): Promise<EventStaffRole | null> {
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from('event_staff_assignments')
+    .select('role')
+    .eq('user_id', userId)
+    .eq('event_id', eventId)
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+  return (data?.role as EventStaffRole) ?? null;
+}
+
+export interface EventAccess {
+  profile: Profile;
+  event: EventWithDetails;
+  /** Non-null when the caller is a member of the event's organization. */
+  orgRole: OrgRole | null;
+  /** Non-null when the caller is assigned as event staff (and not an org member). */
+  staffRole: EventStaffRole | null;
+  /** Full event management (org member, or the event_manager staff role). */
+  canManage: boolean;
+}
+
+/**
+ * Gate a per-event organizer page. Access is granted to members of the event's
+ * organization OR active event staff (assigned co-organizers). Calls notFound()
+ * when the event doesn't exist or the caller has no access. Pass
+ * `{ manageOnly: true }` for pages that require full management rights.
+ */
+export async function requireEventAccess(
+  eventId: string,
+  opts?: { manageOnly?: boolean }
+): Promise<EventAccess> {
+  const profile = await requireAuth();
+  const event = await getEvent(eventId);
+  if (!event) notFound();
+
+  const orgRole = await getOrgRole(profile.id, event.organization_id);
+  const staffRole = orgRole ? null : await getEventStaffRole(profile.id, eventId);
+
+  if (!orgRole && !staffRole) notFound();
+
+  const canManage = Boolean(orgRole) || staffRole === 'event_manager';
+  if (opts?.manageOnly && !canManage) notFound();
+
+  return { profile, event, orgRole, staffRole, canManage };
+}
+
+export interface OrganizerContext {
+  profile: Profile;
+  /** First org the user belongs to, or null for assignment-only co-organizers. */
+  org: (Organization & { role: OrgRole }) | null;
+  /** True when the user has at least one active event staff assignment. */
+  hasAssignments: boolean;
+}
+
+/**
+ * Context for the organizer shell. Unlike getActiveOrganizerOrg, this does NOT
+ * bounce users who are only assigned as event staff (co-organizers) — they can
+ * still reach the portal to manage their assigned events.
+ */
+export async function getOrganizerContext(): Promise<OrganizerContext> {
+  const profile = await requireAuth();
+  const orgs = await getUserOrganizations(profile.id);
+  const assignments = await getUserEventAssignments(profile.id);
+  const hasAssignments = assignments.length > 0;
+
+  if (!orgs.length && !hasAssignments) redirect('/apply-organizer');
+
+  return {
+    profile,
+    org: (orgs[0] as (Organization & { role: OrgRole })) ?? null,
+    hasAssignments,
+  };
+}
+
+/**
+ * Events the user can manage in the organizer portal: everything owned by their
+ * organization plus events they're assigned to as staff. Returns owned + shared
+ * separately so the UI can label them.
+ */
+export async function getAccessibleEvents(userId: string): Promise<{
+  assigned: EventWithDetails[];
+}> {
+  const assignments = await getUserEventAssignments(userId);
+  const seen = new Set<string>();
+  const assigned: EventWithDetails[] = [];
+  for (const a of assignments) {
+    const ev = (a as { event?: EventWithDetails }).event;
+    if (ev && !seen.has(ev.id)) {
+      seen.add(ev.id);
+      assigned.push(ev);
+    }
+  }
+  return { assigned };
 }
