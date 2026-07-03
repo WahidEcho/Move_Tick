@@ -90,11 +90,14 @@ export function PublicHeader() {
                 <span className="sr-only">Account menu</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                {/* Hard navigation: router.push() from inside a dropdown item
+                {/* onClick, not onSelect: @base-ui/react's MenuItem has no
+                    onSelect prop — it silently no-ops, which is why this menu
+                    didn't navigate/sign out despite closing on click. Also a
+                    hard navigation: router.push() from inside a dropdown item
                     intermittently left users stuck on the same page (same
                     class of bug fixed on login/register — see git history). */}
                 <DropdownMenuItem
-                  onSelect={() =>
+                  onClick={() =>
                     window.location.assign(isOrganizer ? '/organizer/overview' : '/dashboard')
                   }
                 >
@@ -102,7 +105,7 @@ export function PublicHeader() {
                   Dashboard
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive" onSelect={() => signOut()}>
+                <DropdownMenuItem variant="destructive" onClick={() => signOut()}>
                   <LogOut className="size-4 shrink-0" />
                   Sign out
                 </DropdownMenuItem>

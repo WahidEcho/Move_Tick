@@ -110,12 +110,15 @@ export function DashboardHeader({
               <span className="sr-only">Account menu</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onSelect={() => window.location.assign('/dashboard')}>
+              {/* onClick, not onSelect: @base-ui/react's MenuItem has no
+                  onSelect prop — it silently no-ops, which is why this menu
+                  didn't navigate/sign out despite closing on click. */}
+              <DropdownMenuItem onClick={() => window.location.assign('/dashboard')}>
                 <LayoutDashboard className="size-4 shrink-0" />
                 Dashboard
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive" onSelect={() => signOut()}>
+              <DropdownMenuItem variant="destructive" onClick={() => signOut()}>
                 <LogOut className="size-4 shrink-0" />
                 Sign out
               </DropdownMenuItem>
