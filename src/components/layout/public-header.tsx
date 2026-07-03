@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { usePathname } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -17,16 +16,20 @@ import { useAuth } from '@/lib/hooks/use-auth';
 import { CalendarDays, LogOut, LayoutDashboard, Menu, XIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const navLinks = [
-  { href: '/events', label: 'Explore Events', icon: CalendarDays },
-  { href: '/apply-organizer', label: 'Host Your Event' },
-];
-
 export function PublicHeader() {
   const pathname = usePathname();
-  const router = useRouter();
   const { user, loading, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Approved organizers already have events to manage — send them straight
+  // to their dashboard instead of the apply-to-become-an-organizer form.
+  const isOrganizer = user?.platform_role === 'organizer';
+  const navLinks = [
+    { href: '/events', label: 'Explore Events', icon: CalendarDays },
+    isOrganizer
+      ? { href: '/organizer/overview', label: 'Manage Events' }
+      : { href: '/apply-organizer', label: 'Host Your Event' },
+  ];
 
   const getInitials = (name: string | null, email: string) => {
     if (name?.trim()) {
@@ -87,7 +90,14 @@ export function PublicHeader() {
                 <span className="sr-only">Account menu</span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onSelect={() => router.push('/dashboard')}>
+                {/* Hard navigation: router.push() from inside a dropdown item
+                    intermittently left users stuck on the same page (same
+                    class of bug fixed on login/register — see git history). */}
+                <DropdownMenuItem
+                  onSelect={() =>
+                    window.location.assign(isOrganizer ? '/organizer/overview' : '/dashboard')
+                  }
+                >
                   <LayoutDashboard className="size-4 shrink-0" />
                   Dashboard
                 </DropdownMenuItem>
@@ -154,7 +164,7 @@ export function PublicHeader() {
             {user ? (
               <>
                 <Link
-                  href="/dashboard"
+                  href={isOrganizer ? '/organizer/overview' : '/dashboard'}
                   onClick={() => setMobileOpen(false)}
                   className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
