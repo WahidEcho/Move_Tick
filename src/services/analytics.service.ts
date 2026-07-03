@@ -144,13 +144,15 @@ export async function getEventAnalytics(eventId: string): Promise<EventAnalytics
     .eq('event_id', eventId)
     .eq('is_active', true);
 
-  const { data: balances } = await supabase
-    .from('ticket_redeem_balances')
-    .select('redeem_item_id, total_allowed')
-    .in(
-      'redeem_item_id',
-      (redeemItems ?? []).map((i) => i.id)
-    );
+  const redeemItemIds = (redeemItems ?? []).map((i) => i.id);
+  // .in() with an empty array is rejected by PostgREST — skip the query
+  // entirely when there are no redeem items (matches the `spaces` guard above).
+  const { data: balances } = redeemItemIds.length
+    ? await supabase
+        .from('ticket_redeem_balances')
+        .select('redeem_item_id, total_allowed')
+        .in('redeem_item_id', redeemItemIds)
+    : { data: [] };
 
   for (const bal of balances ?? []) {
     const curr = redeemByItem.get(bal.redeem_item_id) ?? { redeemed: 0, allowed: 0 };
