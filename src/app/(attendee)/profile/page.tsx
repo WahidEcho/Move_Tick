@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { profileSchema, type ProfileInput } from '@/lib/validations';
+import { AvatarUpload } from '@/components/forms/avatar-upload';
 import { toast } from 'sonner';
 import type { Profile } from '@/types/database.types';
 import { Loader2 } from 'lucide-react';
@@ -23,6 +24,8 @@ export default function ProfilePage() {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ProfileInput>({
     resolver: zodResolver(profileSchema),
@@ -187,13 +190,13 @@ export default function ProfilePage() {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="avatar_url">Avatar URL</Label>
-              <Input
-                id="avatar_url"
-                type="url"
-                {...register('avatar_url')}
-                placeholder="https://..."
-                className={errors.avatar_url ? 'border-destructive' : ''}
+              <Label>Profile picture</Label>
+              <AvatarUpload
+                value={watch('avatar_url') || null}
+                onChange={(url) =>
+                  setValue('avatar_url', url, { shouldDirty: true })
+                }
+                userId={profile.id}
               />
               {errors.avatar_url && (
                 <p className="text-sm text-destructive">

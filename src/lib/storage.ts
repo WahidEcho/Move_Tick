@@ -1,6 +1,7 @@
 import { createClient } from './supabase-browser';
 
 export const EVENT_ASSETS_BUCKET = 'event-assets';
+export const AVATARS_BUCKET = 'avatars';
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 const ALLOWED_IMAGE_TYPES = [
@@ -62,5 +63,33 @@ export async function uploadEventImage(file: File, orgId: string): Promise<Uploa
   }
 
   const { data } = supabase.storage.from(EVENT_ASSETS_BUCKET).getPublicUrl(path);
+  return { url: data.publicUrl, path };
+}
+
+/**
+ * Upload a user's profile picture to the public avatars bucket under
+ * {userId}/{uuid}.<ext> (RLS scopes writes to the owner) and return its public
+ * URL. Validates the file first; throws with a friendly message on failure.
+ */
+export async function uploadAvatar(file: File, userId: string): Promise<UploadResult> {
+  const validationError = validateImageFile(file);
+  if (validationError) throw new Error(validationError);
+
+  const supabase = createClient();
+  const path = `${userId}/${crypto.randomUUID()}.${fileExtension(file)}`;
+
+  const { error } = await supabase.storage
+    .from(AVATARS_BUCKET)
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type,
+    });
+
+  if (error) {
+    throw new Error(`Upload failed: ${error.message}`);
+  }
+
+  const { data } = supabase.storage.from(AVATARS_BUCKET).getPublicUrl(path);
   return { url: data.publicUrl, path };
 }
