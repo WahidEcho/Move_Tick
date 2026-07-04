@@ -211,19 +211,10 @@ export function CreateEventForm({ orgId }: { orgId: string }) {
               error={errors.visibility?.message}
             />
 
-            <FormField
-              label="Capacity"
-              name="capacity"
-              error={errors.capacity?.message}
-              description="Leave empty for unlimited"
-            >
-              <Input
-                type="number"
-                min={1}
-                {...register('capacity', { valueAsNumber: true })}
-                placeholder="Unlimited"
-              />
-            </FormField>
+            <p className="text-xs text-muted-foreground">
+              Capacity is set automatically from your ticket types — add them
+              after creating the event.
+            </p>
           </CardContent>
         </Card>
 

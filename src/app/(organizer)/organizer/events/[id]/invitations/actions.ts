@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { getEventManageAccess } from '@/lib/auth';
 import * as invitationsService from '@/services/invitations.service';
 import { getTicketTypes } from '@/services/tickets.service';
 import type { CSVInviteeRow } from '@/types/domain.types';
@@ -10,13 +11,20 @@ export async function addInvitation(
   orgId: string,
   invitee: { name: string; email: string; ticketTypeId?: string | null }
 ): Promise<{ success: boolean; error?: string }> {
+  // Authorization was missing here entirely — any signed-in user could mint
+  // guest tickets for any event. Gate on manage access and derive the org
+  // from the event (never trust the client-supplied orgId).
+  const access = await getEventManageAccess(eventId);
+  if (!access) {
+    return { success: false, error: 'Event not found' };
+  }
   if (!invitee.email?.trim()) {
     return { success: false, error: 'Email is required' };
   }
   try {
     await invitationsService.createInvitation({
       event_id: eventId,
-      organization_id: orgId,
+      organization_id: access.event.organization_id,
       invitee_name: invitee.name?.trim() || invitee.email.trim(),
       invitee_email: invitee.email.trim().toLowerCase(),
       ticket_type_id: invitee.ticketTypeId ?? null,
@@ -40,6 +48,11 @@ export async function importInvitations(
     return { created: 0, skipped: 0, errors: ['No valid invitations to import'] };
   }
 
+  const access = await getEventManageAccess(eventId);
+  if (!access) {
+    return { created: 0, skipped: 0, errors: ['Event not found'] };
+  }
+
   try {
     const ticketTypes = await getTicketTypes(eventId);
     const ticketTypeMap = new Map(
@@ -61,7 +74,7 @@ export async function importInvitations(
 
     const result = await invitationsService.createBulkInvitations(
       eventId,
-      orgId,
+      access.event.organization_id,
       bulkInput
     );
 
@@ -83,6 +96,10 @@ export async function importInvitations(
 export async function resendFailedInvitations(
   eventId: string
 ): Promise<{ count: number; error?: string }> {
+  const access = await getEventManageAccess(eventId);
+  if (!access) {
+    return { count: 0, error: 'Event not found' };
+  }
   try {
     const count = await invitationsService.resendInvitations(eventId, 'failed');
     revalidatePath(`/organizer/events/${eventId}/invitations`);
@@ -98,6 +115,10 @@ export async function resendInvitation(
   invitationId: string,
   eventId: string
 ): Promise<{ success: boolean; error?: string }> {
+  const access = await getEventManageAccess(eventId);
+  if (!access) {
+    return { success: false, error: 'Event not found' };
+  }
   try {
     await invitationsService.resendInvitation(invitationId);
     revalidatePath(`/organizer/events/${eventId}/invitations`);
@@ -112,6 +133,10 @@ export async function resendInvitation(
 export async function exportInvitations(
   eventId: string
 ): Promise<{ csv: string; error?: string }> {
+  const access = await getEventManageAccess(eventId);
+  if (!access) {
+    return { csv: '', error: 'Event not found' };
+  }
   try {
     const { data } = await invitationsService.getEventInvitations(eventId, {
       page: 1,

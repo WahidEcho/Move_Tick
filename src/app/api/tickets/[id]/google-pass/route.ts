@@ -3,7 +3,7 @@ import { buildGoogleSaveUrlForTicket } from '@/services/wallet.service';
 import { getGoogleConfig } from '@/lib/wallet/config';
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   if (!getGoogleConfig()) {
@@ -11,10 +11,13 @@ export async function GET(
   }
 
   const { id } = await params;
+  // Capability token for guests adding from the invitation email (the ticket's
+  // own qr_token); logged-in users are covered by the cookie session instead.
+  const token = req.nextUrl.searchParams.get('t');
 
   let url: string | null;
   try {
-    url = await buildGoogleSaveUrlForTicket(id);
+    url = await buildGoogleSaveUrlForTicket(id, token);
   } catch (e) {
     console.error('[google-pass] generation failed:', e);
     return NextResponse.json({ error: 'Failed to generate pass' }, { status: 500 });

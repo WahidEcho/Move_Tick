@@ -1,8 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getActiveOrganizerOrg } from '@/lib/auth';
-import { getEvent } from '@/services/events.service';
+import { getEventManageAccess } from '@/lib/auth';
 import {
   assignEventStaff,
   updateStaffRole,
@@ -16,13 +15,12 @@ export async function assignStaffAction(
   role: EventStaffRole,
   spaceId?: string | null
 ): Promise<{ success: true } | { success: false; error: string }> {
-  const { org } = await getActiveOrganizerOrg();
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
+  const access = await getEventManageAccess(eventId);
+  if (!access) {
     return { success: false, error: 'Event not found' };
   }
   try {
-    await assignEventStaff(eventId, org.id, userEmail, role, spaceId);
+    await assignEventStaff(eventId, access.event.organization_id, userEmail, role, spaceId);
     revalidatePath(`/organizer/events/${eventId}`);
     revalidatePath(`/organizer/events/${eventId}/team`);
     return { success: true };
@@ -40,9 +38,8 @@ export async function updateStaffRoleAction(
   role: EventStaffRole,
   spaceId?: string | null
 ): Promise<{ success: true } | { success: false; error: string }> {
-  const { org } = await getActiveOrganizerOrg();
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
+  const access = await getEventManageAccess(eventId);
+  if (!access) {
     return { success: false, error: 'Event not found' };
   }
   try {
@@ -62,9 +59,8 @@ export async function removeStaffAction(
   eventId: string,
   assignmentId: string
 ): Promise<{ success: true } | { success: false; error: string }> {
-  const { org } = await getActiveOrganizerOrg();
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
+  const access = await getEventManageAccess(eventId);
+  if (!access) {
     return { success: false, error: 'Event not found' };
   }
   try {

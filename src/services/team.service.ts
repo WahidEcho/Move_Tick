@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase-server';
+import { getAppUrl } from '@/lib/app-url';
 import { sendStaffAssignmentEmail } from './email.service';
 import type {
   Profile,
@@ -39,12 +40,40 @@ export async function assignEventStaff(
   spaceId?: string | null
 ): Promise<EventStaffAssignment> {
   const supabase = createServiceClient();
+  const email = userEmail.trim().toLowerCase();
 
-  const profile = await findUserByEmail(userEmail);
+  let profile = await findUserByEmail(email);
+  let setupUrl: string | null = null;
+
   if (!profile) {
-    throw new Error(
-      `No account exists for ${userEmail}. Ask them to sign up with this email first, then assign them.`
-    );
+    // No account yet: create one on the spot (Supabase admin invite). The
+    // handle_new_user trigger creates the profile, and the returned action
+    // link signs them in to set their password — no manual signup needed.
+    const { data: invite, error: inviteError } = await supabase.auth.admin.generateLink({
+      type: 'invite',
+      email,
+      options: {
+        redirectTo: `${getAppUrl()}/api/auth/callback?next=/reset-password`,
+      },
+    });
+
+    if (inviteError || !invite?.user) {
+      throw new Error(
+        `Could not create an account for ${email}: ${inviteError?.message ?? 'unknown error'}`
+      );
+    }
+
+    setupUrl = invite.properties?.action_link ?? null;
+    profile = await findUserByEmail(email);
+    if (!profile) {
+      // Trigger latency fallback — the auth user exists, mirror it minimally.
+      const { data: created } = await supabase
+        .from('profiles')
+        .insert({ id: invite.user.id, email })
+        .select()
+        .single();
+      profile = created as Profile;
+    }
   }
 
   const { data, error } = await supabase
@@ -60,19 +89,26 @@ export async function assignEventStaff(
     .select()
     .single();
 
-  if (error) throw new Error(`Failed to assign event staff: ${error.message}`);
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error(`${email} already has the ${role.replace(/_/g, ' ')} role on this event.`);
+    }
+    throw new Error(`Failed to assign event staff: ${error.message}`);
+  }
 
-  // Best-effort: email the co-organizer a direct link to manage the event.
+  // Best-effort: onboarding email — role, event, set-password link (new
+  // accounts) or a direct dashboard link (existing accounts).
   try {
     await sendStaffAssignmentEmail({
       eventId,
       toEmail: profile.email,
       assigneeName: profile.full_name,
       role,
-      needsSignup: false,
+      needsSignup: Boolean(setupUrl),
+      setupUrl,
     });
   } catch (e) {
-    console.warn(`[team] assignment email failed for ${userEmail}:`, e);
+    console.warn(`[team] assignment email failed for ${email}:`, e);
   }
 
   return data as EventStaffAssignment;

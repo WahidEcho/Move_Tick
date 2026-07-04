@@ -100,41 +100,144 @@ export interface StaffAssignmentEmailData {
   eventDateLabel?: string | null;
   /** Direct link into the organizer portal for this event. */
   manageUrl: string;
-  /** True when the invitee has no account yet and must sign up with this email first. */
+  /** True when the account was just created for them (setupUrl present). */
   needsSignup: boolean;
   inviteeEmail: string;
+  /** One-click set-your-password link for freshly created accounts. */
+  setupUrl?: string | null;
 }
 
-/** Co-organizer assignment email: role + a direct link to manage the event. */
+/**
+ * Team onboarding email: role + event, then a numbered getting-started guide.
+ * New accounts get a one-click "Set your password" button (their account is
+ * already created); existing accounts go straight to the event dashboard.
+ */
 export function staffAssignmentEmail(data: StaffAssignmentEmailData): RenderedEmail {
   const greeting = data.assigneeName ? `Hi ${escapeHtml(data.assigneeName)},` : 'Hi,';
   const orgLine = data.organizationName
     ? ` by <strong>${escapeHtml(data.organizationName)}</strong>`
     : '';
-  const signupNote = data.needsSignup
-    ? `<p style="margin:0 0 20px 0;color:#374151;font-size:14px;line-height:1.6;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px;">
-         To access it, first create a free account using this email address
-         (<strong>${escapeHtml(data.inviteeEmail)}</strong>). Once you're signed in,
-         the button below will take you straight to the event.
-       </p>`
+
+  const step = (n: number, text: string) => `
+    <tr><td style="padding:8px 0;vertical-align:top;width:32px;">
+      <div style="width:24px;height:24px;border-radius:12px;background:${BRAND_PURPLE};color:#ffffff;font-size:13px;font-weight:700;text-align:center;line-height:24px;">${n}</div>
+    </td><td style="padding:8px 0 8px 10px;color:#374151;font-size:14px;line-height:1.6;">${text}</td></tr>`;
+
+  const newAccountSteps = `
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px 0;">
+      ${step(1, `We already created your Move-Tick account for <strong>${escapeHtml(data.inviteeEmail)}</strong> — tap the button below to set your password.`)}
+      ${step(2, `On event day, open the Move-Tick app on your phone and sign in with this email (the web dashboard works too).`)}
+      ${step(3, `Go to <strong>Ops → ${escapeHtml(data.eventTitle)}</strong> — your ${escapeHtml(data.roleLabel)} tools will be ready.`)}
+    </table>
+    <div style="text-align:center;margin:0 0 12px 0;">
+      ${button(data.setupUrl ?? data.manageUrl, 'Set your password')}
+    </div>
+    <p style="margin:0 0 8px 0;color:#9ca3af;font-size:12px;line-height:1.6;text-align:center;">
+      Prefer the web? After setting your password you can manage the event at any time from the button in this email.
+    </p>`;
+
+  const existingAccountSteps = `
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px 0;">
+      ${step(1, `Sign in with <strong>${escapeHtml(data.inviteeEmail)}</strong> — on the web or in the Move-Tick app.`)}
+      ${step(2, `Go to <strong>Ops → ${escapeHtml(data.eventTitle)}</strong> — your ${escapeHtml(data.roleLabel)} tools are already unlocked.`)}
+    </table>
+    <div style="text-align:center;margin:0 0 8px 0;">
+      ${button(data.manageUrl, 'Open event dashboard')}
+    </div>`;
+
+  const inner = `
+    <tr><td style="padding:32px 32px 8px 32px;">
+      <p style="margin:0 0 4px 0;color:${BRAND_PURPLE};font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">You've joined the team</p>
+      <h1 style="margin:0 0 16px 0;color:${NEAR_BLACK};font-size:24px;line-height:1.25;">${escapeHtml(data.eventTitle)}</h1>
+      <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:1.6;">
+        ${greeting} you've been added as <strong>${escapeHtml(data.roleLabel)}</strong> for
+        <strong>${escapeHtml(data.eventTitle)}</strong>${orgLine}.
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 20px 0;">
+        ${data.eventDateLabel ? `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">📅 ${escapeHtml(data.eventDateLabel)}</td></tr>` : ''}
+      </table>
+      <p style="margin:0 0 8px 0;color:${NEAR_BLACK};font-size:14px;font-weight:700;">Getting started</p>
+      ${data.needsSignup && data.setupUrl ? newAccountSteps : existingAccountSteps}
+    </td></tr>`;
+  return {
+    subject: `You're on the team for ${data.eventTitle} — ${data.roleLabel}`,
+    html: shell(inner),
+  };
+}
+
+export interface InvitationTicketEmailData {
+  inviteeName: string;
+  eventTitle: string;
+  organizationName?: string | null;
+  eventDateLabel?: string | null;
+  venue?: string | null;
+  city?: string | null;
+  ticketTypeName: string;
+  /** Public RSVP page — works with no account. */
+  rsvpUrl: string;
+  appleWalletUrl?: string | null;
+  googleWalletUrl?: string | null;
+  /** One-click account-setup link (only for invitees with no account yet). */
+  accountSetupUrl?: string | null;
+}
+
+/**
+ * "You're invited" email for admin/organizer invitations: personal invite copy,
+ * RSVP button (public token page — no login), wallet buttons that work for
+ * guests, the QR PDF attached by the sender, and an optional one-click
+ * account-setup link.
+ */
+export function invitationTicketEmail(data: InvitationTicketEmailData): RenderedEmail {
+  const locationLine = [data.venue, data.city]
+    .filter((v): v is string => Boolean(v))
+    .map(escapeHtml)
+    .join(', ');
+  const hostLine = data.organizationName
+    ? `<strong>${escapeHtml(data.organizationName)}</strong> has invited you to`
+    : `You're invited to`;
+  const accountBlock = data.accountSetupUrl
+    ? `
+      <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:12px;padding:16px;text-align:center;margin:0 0 24px 0;">
+        <p style="margin:0 0 10px 0;color:#374151;font-size:13px;line-height:1.6;">
+          Want your ticket saved in one place, plus updates about this event?
+          Activate your free Move-Tick account — one click, no forms.
+        </p>
+        <a href="${data.accountSetupUrl}" style="display:inline-block;background:transparent;border:1.5px solid ${BRAND_PURPLE};color:${BRAND_PURPLE};text-decoration:none;font-size:13px;font-weight:600;padding:9px 18px;border-radius:8px;">Activate my account</a>
+      </div>`
     : '';
   const inner = `
     <tr><td style="padding:32px 32px 8px 32px;">
-      <p style="margin:0 0 4px 0;color:${BRAND_PURPLE};font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">You've been added as a co-organizer</p>
+      <p style="margin:0 0 4px 0;color:${BRAND_PURPLE};font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">You're invited ✨</p>
       <h1 style="margin:0 0 16px 0;color:${NEAR_BLACK};font-size:24px;line-height:1.25;">${escapeHtml(data.eventTitle)}</h1>
-      <p style="margin:0 0 20px 0;color:#374151;font-size:15px;line-height:1.6;">
-        ${greeting} you've been assigned as <strong>${escapeHtml(data.roleLabel)}</strong> for
-        <strong>${escapeHtml(data.eventTitle)}</strong>${orgLine}.
+      <p style="margin:0 0 24px 0;color:#374151;font-size:15px;line-height:1.6;">
+        Hi ${escapeHtml(data.inviteeName)} — ${hostLine} <strong>${escapeHtml(data.eventTitle)}</strong>.
+        Your complimentary <strong>${escapeHtml(data.ticketTypeName)}</strong> ticket is ready and attached
+        to this email as a PDF. No signup needed — just tell us you're coming. 💜
       </p>
       <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px 0;">
         ${data.eventDateLabel ? `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">📅 ${escapeHtml(data.eventDateLabel)}</td></tr>` : ''}
+        ${locationLine ? `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">📍 ${locationLine}</td></tr>` : ''}
       </table>
-      ${signupNote}
-      <div style="text-align:center;margin:0 0 8px 0;">
-        ${button(data.manageUrl, 'Open event dashboard')}
+      <div style="text-align:center;margin:0 0 24px 0;">
+        ${button(data.rsvpUrl, "RSVP & view my ticket")}
       </div>
+      ${data.appleWalletUrl || data.googleWalletUrl ? `
+      <div style="background:#f9fafb;border:1px solid #eee;border-radius:12px;padding:16px;text-align:center;margin:0 0 24px 0;">
+        <p style="margin:0 0 8px 0;color:#9ca3af;font-size:13px;">Add your ticket to your phone:</p>
+        <div>
+          ${data.appleWalletUrl ? `<a href="${data.appleWalletUrl}" style="display:inline-block;background:${NEAR_BLACK};color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;margin:4px;"> Apple Wallet</a>` : ''}
+          ${data.googleWalletUrl ? `<a href="${data.googleWalletUrl}" style="display:inline-block;background:#ffffff;border:1px solid #dadce0;color:#3c4043;text-decoration:none;font-size:13px;font-weight:600;padding:10px 18px;border-radius:8px;margin:4px;">Google Wallet</a>` : ''}
+        </div>
+      </div>` : ''}
+      ${accountBlock}
+      <p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.5;border-left:3px solid ${BRAND_GREEN};padding-left:12px;">
+        At the entrance, just show the QR from the attached PDF or your wallet — it works offline. Can't make it? Use the RSVP link to let the host know.
+      </p>
     </td></tr>`;
-  return { subject: `You're a co-organizer for ${data.eventTitle}`, html: shell(inner) };
+  return {
+    subject: `You're invited: ${data.eventTitle} 🎟️`,
+    html: shell(inner),
+  };
 }
 
 /** Email confirming an issued ticket, with a link to the wallet + QR attached. */

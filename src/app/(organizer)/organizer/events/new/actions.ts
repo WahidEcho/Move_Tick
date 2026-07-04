@@ -25,7 +25,9 @@ export async function createEventAction(
       country: data.country ?? null,
       category: data.category,
       visibility: data.visibility,
-      capacity: data.capacity ?? null,
+      // capacity is derived from ticket types once they're added
+      // (recomputeEventCapacity in tickets.service).
+      capacity: null,
     });
     revalidatePath('/organizer/overview');
     revalidatePath('/organizer/events');

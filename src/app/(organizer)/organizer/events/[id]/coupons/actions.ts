@@ -1,8 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getActiveOrganizerOrg } from '@/lib/auth';
-import { getEvent } from '@/services/events.service';
+import { getEventManageAccess } from '@/lib/auth';
 import {
   createCoupon,
   setCouponActive,
@@ -11,9 +10,8 @@ import {
 } from '@/services/coupons.service';
 
 async function assertOwnsEvent(eventId: string): Promise<void> {
-  const { org } = await getActiveOrganizerOrg();
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
+  const access = await getEventManageAccess(eventId);
+  if (!access) {
     throw new Error('Not authorized for this event');
   }
 }

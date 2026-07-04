@@ -1,6 +1,11 @@
 import { createServiceClient } from '@/lib/supabase-server';
 import { sendEmail, dataUrlToBase64, type SendEmailResult } from '@/lib/email';
-import { ticketIssuedEmail, invitationEmail, staffAssignmentEmail } from '@/lib/email-templates';
+import {
+  ticketIssuedEmail,
+  invitationEmail,
+  invitationTicketEmail,
+  staffAssignmentEmail,
+} from '@/lib/email-templates';
 import type { EventStaffRole } from '@/types/database.types';
 import { walletAvailability } from '@/lib/wallet/config';
 import { getAppUrl as appUrl } from '@/lib/app-url';
@@ -18,7 +23,18 @@ import { format } from 'date-fns';
  * Send the "your ticket is confirmed" email for an issued ticket, with the QR
  * image attached. Looks up the attendee, event, and ticket type by ticket id.
  */
-export async function sendTicketEmail(ticketId: string): Promise<SendEmailResult> {
+export interface InvitationEmailContext {
+  /** Public RSVP page for this invitation (token link, no login needed). */
+  rsvpUrl: string;
+  /** One-click account activation link for invitees without an account. */
+  accountSetupUrl?: string | null;
+  organizationName?: string | null;
+}
+
+export async function sendTicketEmail(
+  ticketId: string,
+  invitation?: InvitationEmailContext
+): Promise<SendEmailResult> {
   const supabase = createServiceClient();
 
   const { data: ticket, error } = await supabase
@@ -53,17 +69,41 @@ export async function sendTicketEmail(ticketId: string): Promise<SendEmailResult
     : null;
 
   const wallet = walletAvailability();
-  const { subject, html } = ticketIssuedEmail({
-    attendeeName: recipientName,
-    eventTitle: event?.title || 'your event',
-    eventDateLabel: dateLabel,
-    venue: event?.venue,
-    city: event?.city,
-    ticketTypeName: ticketType?.name || 'Ticket',
-    ticketUrl: `${appUrl()}/tickets/${ticketId}`,
-    appleWalletUrl: wallet.apple ? `${appUrl()}/api/tickets/${ticketId}/apple-pass` : null,
-    googleWalletUrl: wallet.google ? `${appUrl()}/api/tickets/${ticketId}/google-pass` : null,
-  });
+  // The ticket's own secret token lets wallet buttons work straight from the
+  // email — no login required (the QR is in this same email anyway).
+  const walletToken = ticket.qr_token ? `?t=${ticket.qr_token as string}` : '';
+  const appleWalletUrl = wallet.apple
+    ? `${appUrl()}/api/tickets/${ticketId}/apple-pass${walletToken}`
+    : null;
+  const googleWalletUrl = wallet.google
+    ? `${appUrl()}/api/tickets/${ticketId}/google-pass${walletToken}`
+    : null;
+
+  const { subject, html } = invitation
+    ? invitationTicketEmail({
+        inviteeName: recipientName,
+        eventTitle: event?.title || 'your event',
+        organizationName: invitation.organizationName ?? null,
+        eventDateLabel: dateLabel,
+        venue: event?.venue,
+        city: event?.city,
+        ticketTypeName: ticketType?.name || 'Ticket',
+        rsvpUrl: invitation.rsvpUrl,
+        appleWalletUrl,
+        googleWalletUrl,
+        accountSetupUrl: invitation.accountSetupUrl ?? null,
+      })
+    : ticketIssuedEmail({
+        attendeeName: recipientName,
+        eventTitle: event?.title || 'your event',
+        eventDateLabel: dateLabel,
+        venue: event?.venue,
+        city: event?.city,
+        ticketTypeName: ticketType?.name || 'Ticket',
+        ticketUrl: `${appUrl()}/tickets/${ticketId}`,
+        appleWalletUrl,
+        googleWalletUrl,
+      });
 
   const qrDataUrl = ticket.qr_code as string | null;
   let attachments: EmailAttachment[] | undefined;
@@ -147,6 +187,8 @@ export async function sendStaffAssignmentEmail(params: {
   assigneeName?: string | null;
   role: EventStaffRole;
   needsSignup: boolean;
+  /** Supabase invite action link for brand-new accounts (sets their password). */
+  setupUrl?: string | null;
 }): Promise<SendEmailResult> {
   const supabase = createServiceClient();
 
@@ -170,6 +212,7 @@ export async function sendStaffAssignmentEmail(params: {
     manageUrl: `${appUrl()}/organizer/events/${params.eventId}`,
     needsSignup: params.needsSignup,
     inviteeEmail: params.toEmail,
+    setupUrl: params.setupUrl ?? null,
   });
 
   return sendEmail({ to: params.toEmail, subject, html });

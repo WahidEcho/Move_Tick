@@ -315,18 +315,10 @@ export default function EditEventPage() {
                   onChange={(v) => eventForm.setValue('visibility', v as EventInput['visibility'])}
                   error={eventForm.formState.errors.visibility?.message}
                 />
-                <FormField
-                  label="Capacity"
-                  name="capacity"
-                  error={eventForm.formState.errors.capacity?.message}
-                >
-                  <Input
-                    type="number"
-                    min={1}
-                    {...eventForm.register('capacity', { valueAsNumber: true })}
-                    placeholder="Unlimited"
-                  />
-                </FormField>
+                <p className="text-xs text-muted-foreground">
+                  Capacity is set automatically from your ticket types (managed
+                  in the Tickets tab).
+                </p>
               </CardContent>
             </Card>
 

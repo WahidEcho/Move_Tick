@@ -62,7 +62,36 @@ export async function createTicketType(
     .single();
 
   if (error) throw new Error(`Failed to create ticket type: ${error.message}`);
+
+  await recomputeEventCapacity(eventId);
   return ticketType as TicketType;
+}
+
+/**
+ * events.capacity is DERIVED from the ticket types (organizers no longer type
+ * an attendee count): the sum of active ticket-type capacities, or NULL
+ * (unlimited) when there are no active types or any type is uncapped. Called
+ * after every ticket-type mutation so isFull / "spots left" stay consistent.
+ */
+export async function recomputeEventCapacity(eventId: string): Promise<void> {
+  const supabase = createServiceClient();
+
+  const { data: types } = await supabase
+    .from('ticket_types')
+    .select('capacity')
+    .eq('event_id', eventId)
+    .eq('is_active', true);
+
+  const list = types ?? [];
+  const hasUncapped = list.length === 0 || list.some((t) => t.capacity === null);
+  const total = hasUncapped
+    ? null
+    : list.reduce((sum, t) => sum + (t.capacity as number), 0);
+
+  await supabase
+    .from('events')
+    .update({ capacity: total, updated_at: new Date().toISOString() })
+    .eq('id', eventId);
 }
 
 export async function getTicketTypes(eventId: string): Promise<TicketType[]> {
@@ -99,18 +128,26 @@ export async function updateTicketType(
     .single();
 
   if (error) throw new Error(`Failed to update ticket type: ${error.message}`);
+
+  await recomputeEventCapacity((ticketType as TicketType).event_id);
   return ticketType as TicketType;
 }
 
 export async function deleteTicketType(id: string): Promise<void> {
   const supabase = createServiceClient();
 
-  const { error } = await supabase
+  const { data: deleted, error } = await supabase
     .from('ticket_types')
     .update({ is_active: false, updated_at: new Date().toISOString() })
-    .eq('id', id);
+    .eq('id', id)
+    .select('event_id')
+    .single();
 
   if (error) throw new Error(`Failed to delete ticket type: ${error.message}`);
+
+  if (deleted?.event_id) {
+    await recomputeEventCapacity(deleted.event_id as string);
+  }
 }
 
 export async function issueTicket(

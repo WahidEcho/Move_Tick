@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase-server';
+import { getAppUrl } from '@/lib/app-url';
 import { sendTicketEmail } from './email.service';
 import { issueGuestTicket, issueTicket, createTicketType } from './tickets.service';
 import type {
@@ -53,7 +54,9 @@ async function deliverInvitation(invitationId: string): Promise<void> {
   try {
     const { data: inv } = await supabase
       .from('event_invitations')
-      .select('id, event_id, invitee_email, invitee_name, ticket_type_id')
+      .select(
+        'id, event_id, invitee_email, invitee_name, ticket_type_id, rsvp_token, organization:organizations(name)'
+      )
       .eq('id', invitationId)
       .single();
     if (!inv) return;
@@ -68,6 +71,12 @@ async function deliverInvitation(invitationId: string): Promise<void> {
 
     let ticketId = existingTicket?.id as string | undefined;
 
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', inv.invitee_email as string)
+      .maybeSingle();
+
     if (!ticketId) {
       const ticketTypeId = await resolveInvitationTicketTypeId(
         inv.event_id as string,
@@ -76,12 +85,6 @@ async function deliverInvitation(invitationId: string): Promise<void> {
 
       // If the invitee already has an account, tie the ticket to their profile
       // so it shows up in "My Tickets"; otherwise issue a no-signup guest ticket.
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('email', inv.invitee_email as string)
-        .maybeSingle();
-
       if (profile?.id) {
         const ticket = await issueTicket(
           inv.event_id as string,
@@ -104,14 +107,37 @@ async function deliverInvitation(invitationId: string): Promise<void> {
       }
     }
 
-    const result = await sendTicketEmail(ticketId);
+    // Invitees with no account get a one-click activation link (Supabase admin
+    // invite). Creating the account also claims their guest ticket via the
+    // claim_guest_tickets trigger, so it lands in My Tickets immediately.
+    let accountSetupUrl: string | null = null;
+    if (!profile?.id) {
+      const { data: invite } = await supabase.auth.admin.generateLink({
+        type: 'invite',
+        email: inv.invitee_email as string,
+        options: {
+          data: { full_name: inv.invitee_name ?? '' },
+          redirectTo: `${getAppUrl()}/api/auth/callback?next=/reset-password`,
+        },
+      });
+      accountSetupUrl = invite?.properties?.action_link ?? null;
+    }
 
+    const result = await sendTicketEmail(ticketId, {
+      rsvpUrl: `${getAppUrl()}/rsvp/${inv.rsvp_token as string}`,
+      accountSetupUrl,
+      organizationName:
+        (inv.organization as { name?: string } | null)?.name ?? null,
+    });
+
+    // 'sent' on delivery — acceptance happens on the RSVP page (or at the
+    // gate). The old code marked invitations 'accepted' the moment the email
+    // went out, which made the funnel meaningless.
     await supabase
       .from('event_invitations')
       .update({
-        status: result.ok ? 'accepted' : 'failed',
+        status: result.ok ? 'sent' : 'failed',
         sent_at: result.ok ? new Date().toISOString() : null,
-        responded_at: result.ok ? new Date().toISOString() : null,
       })
       .eq('id', invitationId);
   } catch (e) {

@@ -8,6 +8,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/forms/form-field';
+import { PasswordChecklist } from '@/components/forms/password-checklist';
+import { passwordSchema } from '@/lib/validations';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 
 export default function ResetPasswordPage() {
@@ -33,8 +35,9 @@ export default function ResetPasswordPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+    const parsed = passwordSchema.safeParse(password);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? 'Password does not meet the requirements');
       return;
     }
     if (password !== confirm) {
@@ -95,6 +98,7 @@ export default function ResetPasswordPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full"
                 />
+                <PasswordChecklist password={password} />
               </FormField>
               <FormField label="Confirm password" name="confirm" required>
                 <Input

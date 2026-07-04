@@ -17,16 +17,19 @@ export function InvitationActions({ invitationId, onSuccess }: InvitationActions
   const handleRespond = async (response: 'accepted' | 'declined') => {
     setLoading(response === 'accepted' ? 'accept' : 'decline');
     try {
-      await respondToInvitation(invitationId, response);
+      const result = await respondToInvitation(invitationId, response);
+      if (!result.success) {
+        toast.error(result.message ?? 'Something went wrong');
+        return;
+      }
       toast.success(
         response === 'accepted' ? 'Invitation accepted' : 'Invitation declined'
       );
       onSuccess?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Something went wrong');
-      setLoading(null);
     } finally {
-      if (loading) setLoading(null);
+      setLoading(null);
     }
   };
 

@@ -1,25 +1,33 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createServiceClient } from '@/lib/supabase-server';
+import { createClient, createServiceClient } from '@/lib/supabase-server';
 import { getInvitation, updateInvitationStatus } from '@/services/invitations.service';
 import { issueTicket } from '@/services/tickets.service';
 import { getTicketTypeAvailability } from '@/services/tickets.service';
 import { getTicketTypes } from '@/services/tickets.service';
 
+export type RespondResult = { success: boolean; message?: string };
+
 export async function respondToInvitation(
   invitationId: string,
   response: 'accepted' | 'declined'
-) {
-  const supabase = createServiceClient();
-
+): Promise<RespondResult> {
+  // Auth must come from the request-scoped (cookie) client. The old code
+  // called auth.getUser() on the SERVICE-ROLE client, which never carries a
+  // session — so every user got "Not authenticated" no matter what.
+  const authClient = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+  } = await authClient.auth.getUser();
+  if (!user) {
+    return { success: false, message: 'Your session expired — please sign in again.' };
+  }
+
+  const supabase = createServiceClient();
 
   const invitation = await getInvitation(invitationId);
-  if (!invitation) throw new Error('Invitation not found');
+  if (!invitation) return { success: false, message: 'Invitation not found' };
 
   // Verify the invitation belongs to this user's email
   const { data: profile } = await supabase
@@ -29,11 +37,11 @@ export async function respondToInvitation(
     .single();
 
   if (!profile?.email || profile.email !== invitation.invitee_email) {
-    throw new Error('Invitation not found');
+    return { success: false, message: 'Invitation not found' };
   }
 
   if (invitation.status !== 'pending' && invitation.status !== 'opened' && invitation.status !== 'sent') {
-    throw new Error('Invitation has already been responded to');
+    return { success: false, message: 'Invitation has already been responded to' };
   }
 
   if (response === 'declined') {
@@ -50,7 +58,9 @@ export async function respondToInvitation(
   if (!ticketTypeId) {
     const ticketTypes = await getTicketTypes(eventId);
     const firstPublic = ticketTypes.find((tt) => tt.visibility === 'public') ?? ticketTypes[0];
-    if (!firstPublic) throw new Error('No ticket type available for this event');
+    if (!firstPublic) {
+      return { success: false, message: 'No ticket type available for this event' };
+    }
     ticketTypeId = firstPublic.id;
   }
 
@@ -110,7 +120,9 @@ export async function respondToInvitation(
     source: 'invitation',
   });
 
-  if (regError) throw new Error(`Failed to create registration: ${regError.message}`);
+  if (regError) {
+    return { success: false, message: `Failed to create registration: ${regError.message}` };
+  }
 
   await updateInvitationStatus(invitationId, 'accepted');
 

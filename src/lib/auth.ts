@@ -186,6 +186,28 @@ export async function requireEventAccess(
   return { profile, event, orgRole, staffRole, canManage };
 }
 
+/**
+ * Action-safe variant of requireEventAccess for server actions: returns null
+ * instead of redirecting/notFound-ing, and only grants MANAGE access (org
+ * member or event_manager staff). Use `access.event.organization_id` where the
+ * old getActiveOrganizerOrg() pattern used `org.id`.
+ */
+export async function getEventManageAccess(eventId: string): Promise<EventAccess | null> {
+  const profile = await getProfile();
+  if (!profile) return null;
+
+  const event = await getEvent(eventId);
+  if (!event) return null;
+
+  const orgRole = await getOrgRole(profile.id, event.organization_id);
+  const staffRole = orgRole ? null : await getEventStaffRole(profile.id, eventId);
+
+  const canManage = Boolean(orgRole) || staffRole === 'event_manager';
+  if (!canManage) return null;
+
+  return { profile, event, orgRole, staffRole, canManage };
+}
+
 export interface OrganizerContext {
   profile: Profile;
   /** First org the user belongs to, or null for assignment-only co-organizers. */

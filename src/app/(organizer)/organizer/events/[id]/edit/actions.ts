@@ -1,9 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getActiveOrganizerOrg } from '@/lib/auth';
+import { getEventManageAccess } from '@/lib/auth';
 import {
-  getEvent,
   updateEvent,
   updateEventSettings,
   publishEvent,
@@ -15,10 +14,8 @@ export async function updateEventAction(
   eventId: string,
   data: EventInput
 ): Promise<{ success: true } | { success: false; error: string }> {
-  const { org } = await getActiveOrganizerOrg();
-
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
+  const access = await getEventManageAccess(eventId);
+  if (!access) {
     return { success: false, error: 'Event not found' };
   }
 
@@ -36,7 +33,8 @@ export async function updateEventAction(
       country: data.country ?? null,
       category: data.category,
       visibility: data.visibility,
-      capacity: data.capacity ?? null,
+      // capacity intentionally omitted — derived from ticket types
+      // (recomputeEventCapacity in tickets.service).
     });
     revalidatePath(`/organizer/events/${eventId}`);
     revalidatePath(`/organizer/events/${eventId}/edit`);
@@ -55,10 +53,8 @@ export async function updateEventSettingsAction(
   eventId: string,
   data: EventSettingsInput
 ): Promise<{ success: true } | { success: false; error: string }> {
-  const { org } = await getActiveOrganizerOrg();
-
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
+  const access = await getEventManageAccess(eventId);
+  if (!access) {
     return { success: false, error: 'Event not found' };
   }
 
@@ -90,10 +86,8 @@ export async function updateEventSettingsAction(
 export async function publishEventAction(
   eventId: string
 ): Promise<{ success: true } | { success: false; error: string }> {
-  const { org } = await getActiveOrganizerOrg();
-
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
+  const access = await getEventManageAccess(eventId);
+  if (!access) {
     return { success: false, error: 'Event not found' };
   }
 
@@ -115,10 +109,8 @@ export async function publishEventAction(
 export async function cancelEventAction(
   eventId: string
 ): Promise<{ success: true } | { success: false; error: string }> {
-  const { org } = await getActiveOrganizerOrg();
-
-  const event = await getEvent(eventId);
-  if (!event || event.organization_id !== org.id) {
+  const access = await getEventManageAccess(eventId);
+  if (!access) {
     return { success: false, error: 'Event not found' };
   }
 

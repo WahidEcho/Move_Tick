@@ -1,13 +1,31 @@
 import { z } from 'zod';
 
+/**
+ * Platform password rules, shared by signup + reset-password and mirrored by
+ * the live PasswordChecklist UI. Keep PASSWORD_RULES and passwordSchema in
+ * sync — the checklist renders from PASSWORD_RULES.
+ */
+export const PASSWORD_RULES = [
+  { id: 'length', label: 'At least 8 characters', test: (v: string) => v.length >= 8 },
+  { id: 'uppercase', label: 'One uppercase letter (A–Z)', test: (v: string) => /[A-Z]/.test(v) },
+  { id: 'symbol', label: 'One symbol (!@#$…)', test: (v: string) => /[^A-Za-z0-9\s]/.test(v) },
+] as const;
+
+export const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+  .regex(/[^A-Za-z0-9\s]/, 'Password must contain at least one symbol');
+
 export const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
+  // Login stays permissive so accounts created before the policy can sign in.
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
 export const signupSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: passwordSchema,
   full_name: z.string().min(2, 'Name must be at least 2 characters'),
 });
 
