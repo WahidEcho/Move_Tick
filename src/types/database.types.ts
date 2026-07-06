@@ -12,6 +12,13 @@ export type AttendeePresence = 'inside_event' | 'outside_event' | 'never_arrived
 export type SpaceRegistrationMode = 'walk_in_only' | 'preregistration_required' | 'mixed';
 export type SpaceVisibility = 'public_on_event_page' | 'internal_only';
 export type TicketVisibility = 'public' | 'hidden' | 'invite_only';
+export type OrganizationStatus = 'active' | 'pending' | 'suspended' | 'on_hold' | 'rejected';
+export type NotificationType =
+  | 'org_approved' | 'org_rejected' | 'org_more_info_requested'
+  | 'org_suspended' | 'org_on_hold' | 'org_reactivated'
+  | 'org_limit_reached' | 'event_hidden' | 'event_published' | 'staff_assigned' | 'general';
+export type ContractStatus =
+  | 'draft' | 'generated' | 'sent' | 'viewed' | 'signed' | 'completed' | 'declined' | 'expired' | 'failed';
 
 export interface Profile {
   id: string;
@@ -20,6 +27,8 @@ export interface Profile {
   phone: string | null;
   avatar_url: string | null;
   platform_role: UserRole;
+  is_disabled: boolean;
+  disabled_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -37,6 +46,18 @@ export interface Organization {
   city: string | null;
   type: string | null;
   is_active: boolean;
+  status: OrganizationStatus;
+  contact_email: string | null;
+  contact_phone: string | null;
+  max_events: number | null;
+  max_published_events: number | null;
+  can_create_paid: boolean;
+  requires_publish_approval: boolean;
+  commission_percentage: number | null;
+  fixed_fee_egp: number | null;
+  suspended_reason: string | null;
+  hide_events_on_suspend: boolean;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -98,6 +119,8 @@ export interface Event {
   capacity: number | null;
   is_published: boolean;
   is_cancelled: boolean;
+  is_hidden: boolean;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
   organization?: Organization;
@@ -312,4 +335,78 @@ export interface RedeemLog {
   station: string | null;
   notes: string | null;
   created_at: string;
+}
+
+// ─── Round 5: super-admin control center ──────────────────────────────────
+
+export interface PlatformSettings {
+  id: string;
+  commission_percentage: number;
+  fixed_fee_egp: number;
+  event_expiry_buffer_hours: number;
+  default_timezone: string;
+  org_approval_required: boolean;
+  default_max_events: number | null;
+  default_event_duration_hours: number | null;
+  support_email: string;
+  admin_alert_email: string;
+  public_contact: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  organization_id: string | null;
+  notification_type: NotificationType;
+  title: string;
+  message: string;
+  is_read: boolean;
+  related_entity_type: string | null;
+  related_entity_id: string | null;
+  created_at: string;
+}
+
+export interface AdminAuditLogEntry {
+  id: string;
+  actor_id: string | null;
+  action: string;
+  target_type: string;
+  target_id: string | null;
+  previous_value: Json | null;
+  new_value: Json | null;
+  reason: string | null;
+  created_at: string;
+  actor?: Profile;
+}
+
+export interface EmailLogEntry {
+  id: string;
+  recipient_email: string;
+  email_type: string;
+  subject: string;
+  related_organization_id: string | null;
+  related_event_id: string | null;
+  delivery_status: 'sent' | 'failed';
+  failure_reason: string | null;
+  sent_at: string;
+}
+
+export interface Contract {
+  id: string;
+  organization_id: string;
+  entity_name: string;
+  contract_template_id: string | null;
+  docusign_envelope_id: string | null;
+  docusign_signing_url: string | null;
+  contract_status: ContractStatus;
+  commission_percentage: number | null;
+  fixed_fee_per_paid_ticket: number | null;
+  generated_at: string | null;
+  sent_at: string | null;
+  signed_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
 }
