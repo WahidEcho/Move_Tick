@@ -1,6 +1,7 @@
 import { createClient, createServiceClient } from './supabase-server';
 import { redirect, notFound } from 'next/navigation';
 import { getEvent, type EventWithDetails } from '@/services/events.service';
+import { canAccessAdminPanel, canAccessOrganizerDashboard } from './permissions';
 import type { Profile, OrgRole, EventStaffRole, Organization } from '@/types/database.types';
 
 export async function getSession() {
@@ -38,7 +39,7 @@ export async function requireAuth(): Promise<Profile> {
 
 export async function requireAdmin(): Promise<Profile> {
   const profile = await requireAuth();
-  if (profile.platform_role !== 'admin') redirect('/');
+  if (!canAccessAdminPanel(profile.platform_role)) redirect('/');
   return profile;
 }
 
@@ -233,9 +234,8 @@ export async function getOrganizerContext(): Promise<OrganizerContext> {
   const orgs = await getUserOrganizations(profile.id);
   const assignments = await getUserEventAssignments(profile.id);
   const hasAssignments = assignments.length > 0;
-  const isAdmin = profile.platform_role === 'admin';
 
-  if (!isAdmin && !orgs.length && !hasAssignments) redirect('/apply-organizer');
+  if (!canAccessOrganizerDashboard(profile.platform_role, orgs, hasAssignments)) redirect('/apply-organizer');
 
   return {
     profile,

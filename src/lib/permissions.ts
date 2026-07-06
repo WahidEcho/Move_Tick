@@ -76,12 +76,84 @@ export type Permission =
 
 export function canAccessOrganizerDashboard(
   platformRole: UserRole,
-  orgMemberships: { role: OrgRole }[]
+  orgMemberships: { role: OrgRole }[],
+  hasEventAssignments: boolean = false
 ): boolean {
   if (isPlatformAdmin(platformRole)) return true;
-  return orgMemberships.length > 0;
+  return orgMemberships.length > 0 || hasEventAssignments;
 }
 
 export function canAccessAdminPanel(platformRole: UserRole): boolean {
   return isPlatformAdmin(platformRole);
 }
+
+/**
+ * Plain-English capability matrix — documents what auth.ts's guards
+ * (requireAdmin, requireEventAccess, getOrganizerContext) and the RLS
+ * policies in supabase/migrations already enforce. Not itself an
+ * enforcement mechanism; it's the reference for "who can do X."
+ */
+export interface PermissionMatrixEntry {
+  role: string;
+  scope: string;
+  capabilities: string[];
+}
+
+export const PERMISSION_MATRIX: PermissionMatrixEntry[] = [
+  {
+    role: 'Platform admin (profiles.platform_role = "admin")',
+    scope: 'Platform-wide — every organization, event, and user',
+    capabilities: [
+      'Full CRUD on any event: edit, hide/unhide, publish/unpublish, change organizer, archive/restore (soft delete), assign/remove staff — via the organizer UI (requireEventAccess admin bypass) and /admin/events',
+      'Full control of any organization: edit contact/limits/commission, suspend/hold/reactivate, archive/restore — /admin/organizations',
+      'Full control of any user: edit profile, change platform role, disable/enable (bans at the Supabase Auth level), assign to an organization or event team — /admin/users',
+      'Approve / reject / request-more-info on organizer applications — /admin/applications',
+      'Bypasses organizer limits (src/lib/org-limits.ts) when creating/publishing through the organizer UI — the limits are a self-service organizer guardrail, not an admin restriction',
+      'Views platform-wide analytics, the super-admin dashboard, the audit log, and the email log',
+      'Edits platform settings: default commission/fixed fee, event expiry buffer, org-approval requirement, default limits, contact addresses',
+    ],
+  },
+  {
+    role: 'Organization owner / admin / manager (organization_members.role)',
+    scope: 'Their own organization only',
+    capabilities: [
+      'Create, edit, publish, cancel events for their organization (subject to org-limits.ts: max events, max published events, paid-ticket permission, publish-approval requirement)',
+      'Manage ticket types, spaces, redeem items, invitations, coupons, and team for their own events',
+      'Assign/remove event staff on their own events',
+      "View their organization's analytics and dashboard summary",
+      'No visibility into other organizations\' data (enforced by RLS: is_org_member/is_org_admin)',
+    ],
+  },
+  {
+    role: 'Event staff — event_manager (event_staff_assignments.role)',
+    scope: 'Only the specific event(s) they are assigned to',
+    capabilities: [
+      'Same event-management capabilities as an org member, scoped to the assigned event only',
+      'Counts as "canManage" in requireEventAccess — can edit the event, manage tickets/spaces/team for it',
+    ],
+  },
+  {
+    role: 'Event staff — gate_scanner / space_controller / redeemer / support_staff',
+    scope: 'Only the specific event(s) they are assigned to',
+    capabilities: [
+      'Gate check-in/check-out scanning, space occupancy scanning, redeem-item scanning respectively',
+      'Cannot edit event details, ticket types, or team — read/operate only',
+    ],
+  },
+  {
+    role: 'Organizer (profiles.platform_role = "organizer", no active membership)',
+    scope: 'None until assigned to an organization or event',
+    capabilities: [
+      'Set automatically on organizer-application approval; grants no access by itself — actual access comes from organization_members or event_staff_assignments rows',
+    ],
+  },
+  {
+    role: 'Attendee (profiles.platform_role = "attendee")',
+    scope: 'Their own registrations, tickets, and invitations',
+    capabilities: [
+      'Browse public, non-expired events; register or purchase tickets',
+      'View/manage their own tickets, invitations, and notifications',
+      'No organizer or admin surface access',
+    ],
+  },
+];

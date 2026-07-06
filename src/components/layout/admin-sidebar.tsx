@@ -17,6 +17,9 @@ import {
   CalendarDays,
   Users,
   BarChart3,
+  Settings,
+  ShieldAlert,
+  Mail,
 } from 'lucide-react';
 
 const adminNavItems = [
@@ -26,6 +29,9 @@ const adminNavItems = [
   { href: '/admin/events', label: 'Events', icon: CalendarDays },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/admin/audit', label: 'Audit Log', icon: ShieldAlert },
+  { href: '/admin/emails', label: 'Email Log', icon: Mail },
+  { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
 export function AdminSidebar() {
