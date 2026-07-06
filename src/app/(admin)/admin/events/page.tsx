@@ -1,12 +1,11 @@
 import { requireAdmin } from '@/lib/auth';
-import { getEvents, getEventStats } from '@/services/events.service';
+import { getEventsForAdmin, getEventStats, type AdminEventStatus } from '@/services/events.service';
 import { EventsListClient } from './events-list-client';
 
 interface EventsPageProps {
   searchParams: Promise<{
     search?: string;
-    visibility?: string;
-    published?: string;
+    status?: string;
     page?: string;
   }>;
 }
@@ -16,24 +15,12 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
 
   const params = await searchParams;
   const search = params.search ?? '';
-  const visibility = params.visibility as
-    | 'public'
-    | 'private'
-    | 'invite_only'
-    | 'members_only'
-    | undefined;
-  const is_published =
-    params.published === 'true'
-      ? true
-      : params.published === 'false'
-        ? false
-        : undefined;
+  const status = (params.status || 'all') as AdminEventStatus;
   const page = Number(params.page) || 1;
 
-  const result = await getEvents({
+  const result = await getEventsForAdmin({
     search: search || undefined,
-    visibility,
-    is_published,
+    status,
     page,
     page_size: 20,
   });

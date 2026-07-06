@@ -264,6 +264,76 @@ export async function getPublicEvents(
   });
 }
 
+export type AdminEventStatus = 'all' | 'draft' | 'published' | 'hidden' | 'cancelled' | 'expired' | 'archived';
+
+export interface GetEventsForAdminFilters {
+  search?: string;
+  status?: AdminEventStatus;
+  page?: number;
+  page_size?: number;
+}
+
+/**
+ * Admin events list query — sees every event regardless of organization,
+ * with status categories that combine publish state, manual hide, soft
+ * delete, and computed expiry (unlike getEvents/getPublicEvents, which only
+ * ever show what a given viewer is allowed to see).
+ */
+export async function getEventsForAdmin(
+  filters: GetEventsForAdminFilters = {}
+): Promise<PaginatedResult<EventWithDetails>> {
+  const { search, status = 'all', page = 1, page_size = 20 } = filters;
+  const supabase = createServiceClient();
+
+  let query = supabase
+    .from('events')
+    .select(`*, organization:organizations(id, name, slug)`, { count: 'exact' });
+
+  if (search && search.trim()) {
+    query = query.or(
+      `title.ilike.%${search.trim()}%,description.ilike.%${search.trim()}%,venue.ilike.%${search.trim()}%`
+    );
+  }
+
+  if (status === 'draft') {
+    query = query.eq('is_published', false);
+  } else if (status === 'hidden') {
+    query = query.eq('is_hidden', true);
+  } else if (status === 'cancelled') {
+    query = query.eq('is_cancelled', true);
+  } else if (status === 'archived') {
+    query = query.not('archived_at', 'is', null);
+  } else if (status === 'published') {
+    const threshold = await getExpiryThresholdISO();
+    query = query
+      .eq('is_published', true)
+      .eq('is_cancelled', false)
+      .eq('is_hidden', false)
+      .is('archived_at', null)
+      .gte('end_date', threshold);
+  } else if (status === 'expired') {
+    const threshold = await getExpiryThresholdISO();
+    query = query.eq('is_cancelled', false).is('archived_at', null).lt('end_date', threshold);
+  }
+
+  const from = (page - 1) * page_size;
+  const to = from + page_size - 1;
+  query = query.order('start_date', { ascending: false }).range(from, to);
+
+  const { data, error, count } = await query;
+
+  if (error) throw new Error(`Failed to fetch events: ${error.message}`);
+
+  const total = count ?? 0;
+  return {
+    data: (data ?? []) as EventWithDetails[],
+    total,
+    page,
+    page_size,
+    total_pages: Math.ceil(total / page_size) || 1,
+  };
+}
+
 export async function updateEvent(
   id: string,
   data: UpdateEventData
@@ -343,7 +413,8 @@ export async function getOrganizationEvents(
     `,
       { count: 'exact' }
     )
-    .eq('organization_id', orgId);
+    .eq('organization_id', orgId)
+    .is('archived_at', null);
 
   if (category) dbQuery = dbQuery.eq('category', category);
   if (is_published !== undefined) dbQuery = dbQuery.eq('is_published', is_published);

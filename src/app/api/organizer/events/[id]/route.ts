@@ -14,10 +14,12 @@ export async function GET(
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  // Org members OR assigned event staff (co-organizers) may load the event.
+  // Org members, assigned event staff (co-organizers), or a platform admin
+  // (full manage access to any event) may load the event.
+  const isAdmin = profile.platform_role === 'admin';
   const orgRole = await getOrgRole(profile.id, event.organization_id);
   const staffRole = orgRole ? null : await getEventStaffRole(profile.id, id);
-  if (!orgRole && !staffRole) {
+  if (!isAdmin && !orgRole && !staffRole) {
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 

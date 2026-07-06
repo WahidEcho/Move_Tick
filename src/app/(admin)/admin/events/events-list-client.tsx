@@ -7,40 +7,67 @@ import { DataTable } from '@/components/tables/data-table';
 import { TableFilters } from '@/components/tables/table-filters';
 import { Pagination } from '@/components/tables/pagination';
 import { Badge } from '@/components/ui/badge';
+import { EventRowActions } from './event-row-actions';
 import type { EventWithDetails } from '@/services/events.service';
 import type { PaginatedResult } from '@/types/domain.types';
 import { CalendarDays } from 'lucide-react';
 
-const VISIBILITY_OPTIONS = [
-  { label: 'All', value: '' },
-  { label: 'Public', value: 'public' },
-  { label: 'Private', value: 'private' },
-  { label: 'Invite Only', value: 'invite_only' },
-  { label: 'Members Only', value: 'members_only' },
-];
-
-const PUBLISHED_OPTIONS = [
-  { label: 'All', value: '' },
-  { label: 'Published', value: 'true' },
-  { label: 'Draft', value: 'false' },
+const STATUS_OPTIONS = [
+  { label: 'All', value: 'all' },
+  { label: 'Published (live)', value: 'published' },
+  { label: 'Draft', value: 'draft' },
+  { label: 'Hidden', value: 'hidden' },
+  { label: 'Expired', value: 'expired' },
+  { label: 'Cancelled', value: 'cancelled' },
+  { label: 'Archived', value: 'archived' },
 ];
 
 interface EventsListClientProps {
   result: PaginatedResult<EventWithDetails>;
   searchParams: {
     search?: string;
-    visibility?: string;
-    published?: string;
+    status?: string;
     page?: string;
   };
   registrationCounts: Record<string, number>;
 }
 
-function formatVisibility(v: string): string {
-  return v
-    .split('_')
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-    .join(' ');
+function StatusBadges({ event }: { event: EventWithDetails }) {
+  if (event.archived_at) {
+    return <Badge variant="outline" className="bg-muted text-muted-foreground">Archived</Badge>;
+  }
+  if (event.is_cancelled) {
+    return <Badge variant="outline" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">Cancelled</Badge>;
+  }
+  const badges = [];
+  badges.push(
+    <Badge
+      key="published"
+      variant="outline"
+      className={
+        event.is_published
+          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+          : 'bg-muted text-muted-foreground'
+      }
+    >
+      {event.is_published ? 'Published' : 'Draft'}
+    </Badge>
+  );
+  if (event.is_hidden) {
+    badges.push(
+      <Badge key="hidden" variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+        Hidden
+      </Badge>
+    );
+  }
+  if (new Date(event.end_date) < new Date()) {
+    badges.push(
+      <Badge key="expired" variant="outline" className="bg-muted text-muted-foreground">
+        Ended
+      </Badge>
+    );
+  }
+  return <div className="flex flex-wrap gap-1">{badges}</div>;
 }
 
 export function EventsListClient({
@@ -54,8 +81,7 @@ export function EventsListClient({
 
   const { data, total, page, page_size, total_pages } = result;
   const search = searchParams.search ?? '';
-  const visibility = searchParams.visibility ?? '';
-  const published = searchParams.published ?? '';
+  const status = searchParams.status ?? 'all';
   const currentPage = Number(searchParams.page) || 1;
 
   const buildUrl = useCallback(
@@ -79,13 +105,13 @@ export function EventsListClient({
 
   const handleSearchChange = (value: string) => {
     startTransition(() => {
-      router.push(buildUrl({ search: value, visibility, published }));
+      router.push(buildUrl({ search: value, status }));
     });
   };
 
   const handleFilterChange = (key: string, value: string) => {
     startTransition(() => {
-      const updates: Record<string, string> = { search, visibility, published };
+      const updates: Record<string, string> = { search, status };
       updates[key] = value;
       router.push(buildUrl(updates));
     });
@@ -129,29 +155,9 @@ export function EventsListClient({
         }),
     },
     {
-      key: 'visibility',
-      label: 'Visibility',
-      render: (row: EventWithDetails) => (
-        <Badge variant="outline" className="bg-muted/60">
-          {formatVisibility(row.visibility)}
-        </Badge>
-      ),
-    },
-    {
-      key: 'published',
-      label: 'Published',
-      render: (row: EventWithDetails) => (
-        <Badge
-          variant="outline"
-          className={
-            row.is_published
-              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-              : 'bg-muted text-muted-foreground'
-          }
-        >
-          {row.is_published ? 'Yes' : 'Draft'}
-        </Badge>
-      ),
+      key: 'status',
+      label: 'Status',
+      render: (row: EventWithDetails) => <StatusBadges event={row} />,
     },
     {
       key: 'registrations',
@@ -169,6 +175,12 @@ export function EventsListClient({
           day: 'numeric',
         }),
     },
+    {
+      key: 'actions',
+      label: '',
+      className: 'w-10 text-right',
+      render: (row: EventWithDetails) => <EventRowActions event={row} />,
+    },
   ];
 
   return (
@@ -177,12 +189,9 @@ export function EventsListClient({
         searchPlaceholder="Search by title or venue..."
         searchValue={search}
         onSearchChange={handleSearchChange}
-        filters={[
-          { key: 'visibility', label: 'Visibility', options: VISIBILITY_OPTIONS },
-          { key: 'published', label: 'Status', options: PUBLISHED_OPTIONS },
-        ]}
+        filters={[{ key: 'status', label: 'Status', options: STATUS_OPTIONS }]}
         onFilterChange={handleFilterChange}
-        filterValues={{ visibility, published }}
+        filterValues={{ status }}
       />
       <DataTable<EventWithDetails>
         columns={columns}

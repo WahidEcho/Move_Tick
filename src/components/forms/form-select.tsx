@@ -42,6 +42,7 @@ function FormSelect({
       <Select
         value={value ?? ""}
         onValueChange={(v) => onChange(v ?? "")}
+        items={options}
         aria-invalid={!!error}
         aria-describedby={error ? `${name}-error` : undefined}
       >

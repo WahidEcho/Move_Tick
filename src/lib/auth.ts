@@ -163,9 +163,11 @@ export interface EventAccess {
 
 /**
  * Gate a per-event organizer page. Access is granted to members of the event's
- * organization OR active event staff (assigned co-organizers). Calls notFound()
- * when the event doesn't exist or the caller has no access. Pass
- * `{ manageOnly: true }` for pages that require full management rights.
+ * organization, active event staff (assigned co-organizers), OR a platform
+ * admin (full manage access to every event — this is how the super-admin
+ * event controls reuse the entire organizer UI instead of duplicating it).
+ * Calls notFound() when the event doesn't exist or the caller has no access.
+ * Pass `{ manageOnly: true }` for pages that require full management rights.
  */
 export async function requireEventAccess(
   eventId: string,
@@ -175,12 +177,13 @@ export async function requireEventAccess(
   const event = await getEvent(eventId);
   if (!event) notFound();
 
+  const isAdmin = profile.platform_role === 'admin';
   const orgRole = await getOrgRole(profile.id, event.organization_id);
   const staffRole = orgRole ? null : await getEventStaffRole(profile.id, eventId);
 
-  if (!orgRole && !staffRole) notFound();
+  if (!isAdmin && !orgRole && !staffRole) notFound();
 
-  const canManage = Boolean(orgRole) || staffRole === 'event_manager';
+  const canManage = isAdmin || Boolean(orgRole) || staffRole === 'event_manager';
   if (opts?.manageOnly && !canManage) notFound();
 
   return { profile, event, orgRole, staffRole, canManage };
@@ -199,10 +202,11 @@ export async function getEventManageAccess(eventId: string): Promise<EventAccess
   const event = await getEvent(eventId);
   if (!event) return null;
 
+  const isAdmin = profile.platform_role === 'admin';
   const orgRole = await getOrgRole(profile.id, event.organization_id);
   const staffRole = orgRole ? null : await getEventStaffRole(profile.id, eventId);
 
-  const canManage = Boolean(orgRole) || staffRole === 'event_manager';
+  const canManage = isAdmin || Boolean(orgRole) || staffRole === 'event_manager';
   if (!canManage) return null;
 
   return { profile, event, orgRole, staffRole, canManage };
@@ -219,15 +223,19 @@ export interface OrganizerContext {
 /**
  * Context for the organizer shell. Unlike getActiveOrganizerOrg, this does NOT
  * bounce users who are only assigned as event staff (co-organizers) — they can
- * still reach the portal to manage their assigned events.
+ * still reach the portal to manage their assigned events. Platform admins are
+ * never bounced either (org stays null; deep-linked event pages grant them
+ * full access via requireEventAccess's admin bypass) — this is what lets the
+ * super-admin event controls reuse /organizer/events/{id}/... directly.
  */
 export async function getOrganizerContext(): Promise<OrganizerContext> {
   const profile = await requireAuth();
   const orgs = await getUserOrganizations(profile.id);
   const assignments = await getUserEventAssignments(profile.id);
   const hasAssignments = assignments.length > 0;
+  const isAdmin = profile.platform_role === 'admin';
 
-  if (!orgs.length && !hasAssignments) redirect('/apply-organizer');
+  if (!isAdmin && !orgs.length && !hasAssignments) redirect('/apply-organizer');
 
   return {
     profile,

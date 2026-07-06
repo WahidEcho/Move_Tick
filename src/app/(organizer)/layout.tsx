@@ -9,10 +9,10 @@ export default async function OrganizerLayout({
 }) {
   const { profile, org } = await getOrganizerContext();
 
-  // Assignment-only co-organizers have no organization of their own; show a
-  // neutral label so the shell still renders for them.
+  // Assignment-only co-organizers and platform admins have no organization of
+  // their own; show a neutral label so the shell still renders for them.
   const shellOrg =
-    org ?? ({ name: 'Shared events' } as Organization);
+    org ?? ({ name: profile.platform_role === 'admin' ? 'Platform Admin' : 'Shared events' } as Organization);
 
   return (
     <OrganizerShell profile={profile} org={shellOrg}>
