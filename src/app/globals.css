@@ -151,9 +151,23 @@
   100% { background-position: 200% 0; }
 }
 
+@keyframes mt-marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes mt-aurora {
+  0%, 100% { transform: translate(-10%, -6%) rotate(0deg) scale(1); }
+  33% { transform: translate(8%, 4%) rotate(8deg) scale(1.15); }
+  66% { transform: translate(-4%, 8%) rotate(-6deg) scale(1.05); }
+}
+
 .mt-float { animation: mt-float 9s ease-in-out infinite; }
 .mt-float-slow { animation: mt-float 14s ease-in-out infinite; }
 .mt-pulse-glow { animation: mt-pulse-glow 6s ease-in-out infinite; }
+.mt-marquee { animation: mt-marquee 36s linear infinite; }
+.mt-marquee:hover { animation-play-state: paused; }
+.mt-aurora { animation: mt-aurora 18s ease-in-out infinite; }
+.mt-aurora-slow { animation: mt-aurora 26s ease-in-out infinite reverse; }
 .mt-gradient-text {
   background: linear-gradient(90deg, #5b3be8, #4ade00, #5b3be8);
   background-size: 200% auto;
@@ -162,9 +176,27 @@
   color: transparent;
   animation: mt-gradient 6s ease infinite;
 }
+/* Hide scrollbars on horizontal pill rows */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+/* Card glow ring on hover (landing + explore cards) */
+.mt-card-glow {
+  transition: box-shadow 0.35s ease, transform 0.35s ease, border-color 0.35s ease;
+}
+.mt-card-glow:hover {
+  box-shadow:
+    0 0 0 1px rgb(91 59 232 / 0.45),
+    0 18px 50px -12px rgb(91 59 232 / 0.35),
+    0 4px 18px -4px rgb(74 222 0 / 0.12);
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .mt-float, .mt-float-slow, .mt-pulse-glow, .mt-gradient-text {
+  .mt-float, .mt-float-slow, .mt-pulse-glow, .mt-gradient-text,
+  .mt-marquee, .mt-aurora, .mt-aurora-slow {
     animation: none !important;
   }
 }
