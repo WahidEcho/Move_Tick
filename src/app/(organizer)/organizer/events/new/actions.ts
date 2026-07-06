@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getActiveOrganizerOrg } from '@/lib/auth';
 import { createEvent } from '@/services/events.service';
+import { assertCanCreateEvent } from '@/lib/org-limits';
+import { sendAdminOrgAlert } from '@/services/admin-alerts.service';
 import type { EventInput } from '@/lib/validations';
 
 export async function createEventAction(
@@ -12,6 +14,21 @@ export async function createEventAction(
   const { org } = await getActiveOrganizerOrg();
 
   try {
+    try {
+      await assertCanCreateEvent(org.id);
+    } catch (limitErr) {
+      const message = limitErr instanceof Error ? limitErr.message : '';
+      if (message.includes('event limit')) {
+        await sendAdminOrgAlert({
+          action: 'Organization reached its event limit',
+          organizationId: org.id,
+          organizationName: org.name,
+          dashboardPath: '/admin/organizations',
+        }).catch(() => {});
+      }
+      throw limitErr;
+    }
+
     const event = await createEvent(org.id, {
       title: data.title,
       slug: data.slug,

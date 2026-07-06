@@ -8,6 +8,11 @@ import {
   publishEvent,
   cancelEvent,
 } from '@/services/events.service';
+import { getTicketTypes } from '@/services/tickets.service';
+import { assertCanPublish } from '@/lib/org-limits';
+import { sendAdminOrgAlert } from '@/services/admin-alerts.service';
+import { getOrganizationMembers } from '@/services/organizations.service';
+import { createNotification } from '@/services/notifications.service';
 import type { EventInput, EventSettingsInput } from '@/lib/validations';
 
 export async function updateEventAction(
@@ -91,7 +96,68 @@ export async function publishEventAction(
     return { success: false, error: 'Event not found' };
   }
 
+  const isAdmin = access.profile.platform_role === 'admin';
+  const orgId = access.event.organization_id;
+  const orgName = access.event.organization?.name ?? 'Unknown organization';
+
   try {
+    // Platform admins bypass organizer limits entirely — they have override
+    // authority (this is also how the admin events list's Publish action
+    // reaches the same underlying rule-free path via adminSetEventPublished).
+    if (!isAdmin) {
+      const ticketTypes = await getTicketTypes(eventId);
+      const isPaid = ticketTypes.some((tt) => tt.price > 0);
+
+      let limitResult: { requiresApproval: boolean };
+      try {
+        limitResult = await assertCanPublish(orgId, isPaid);
+      } catch (limitErr) {
+        const message = limitErr instanceof Error ? limitErr.message : '';
+        if (message.includes('published-event limit')) {
+          await sendAdminOrgAlert({
+            action: 'Organization reached its published-event limit',
+            organizationId: orgId,
+            organizationName: orgName,
+            eventId,
+            eventTitle: access.event.title,
+            dashboardPath: '/admin/organizations',
+          }).catch(() => {});
+        }
+        throw limitErr;
+      }
+
+      if (limitResult.requiresApproval) {
+        const members = await getOrganizationMembers(orgId);
+        await Promise.allSettled([
+          ...members.map((m) =>
+            createNotification({
+              userId: m.user_id,
+              organizationId: orgId,
+              type: 'general',
+              title: 'Publish request sent for review',
+              message: `"${access.event.title}" needs admin approval before it goes live. We've notified the Move-Tick team.`,
+              relatedEntityType: 'event',
+              relatedEntityId: eventId,
+            })
+          ),
+          sendAdminOrgAlert({
+            action: 'Organization requests event publish approval',
+            organizationId: orgId,
+            organizationName: orgName,
+            eventId,
+            eventTitle: access.event.title,
+            dashboardPath: '/admin/events',
+          }),
+        ]);
+
+        return {
+          success: false,
+          error:
+            "Your organization requires admin approval before publishing. We've notified the Move-Tick team — you'll be notified once it's approved.",
+        };
+      }
+    }
+
     await publishEvent(eventId);
     revalidatePath(`/organizer/events/${eventId}`);
     revalidatePath(`/organizer/events/${eventId}/edit`);
