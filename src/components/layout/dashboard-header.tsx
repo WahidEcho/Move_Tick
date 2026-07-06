@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/lib/hooks/use-auth';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 import { Menu, LayoutDashboard, LogOut, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types/ui.types';
@@ -94,6 +95,7 @@ export function DashboardHeader({
 
         <div className="flex shrink-0 items-center gap-2">
           {actions}
+          <NotificationBell userId={user?.id} />
           <DropdownMenu>
             <DropdownMenuTrigger
               render={<Button variant="ghost" size="icon" className="rounded-full" />}

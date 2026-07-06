@@ -15,7 +15,7 @@ const PUBLIC_ROUTES = [
   '/forgot-password',
   '/reset-password',
 ];
-const ATTENDEE_ROUTES = ['/dashboard', '/tickets', '/invitations', '/profile'];
+const ATTENDEE_ROUTES = ['/dashboard', '/tickets', '/invitations', '/profile', '/notifications'];
 const ORGANIZER_ROUTES = ['/organizer'];
 const ADMIN_ROUTES = ['/admin'];
 
