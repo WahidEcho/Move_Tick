@@ -214,6 +214,8 @@ export async function approveApplication(
       city: application.city,
       type: application.organization_type,
       is_active: true,
+      contact_email: application.email,
+      contact_phone: application.phone,
     })
     .select()
     .single();

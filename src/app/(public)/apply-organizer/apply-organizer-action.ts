@@ -6,6 +6,7 @@ import { getProfile } from '@/lib/auth';
 import { submitApplication, getUserApplication } from '@/services/organizerApplications.service';
 import type { OrganizerApplicationWithProfile } from '@/services/organizerApplications.service';
 import type { OrganizerApplicationInput } from '@/lib/validations';
+import { sendAdminOrgAlert } from '@/services/admin-alerts.service';
 
 export async function getMyApplication(): Promise<OrganizerApplicationWithProfile | null> {
   const profile = await getProfile();
@@ -41,6 +42,16 @@ export async function submitApplyOrganizer(
       terms_accepted: data.terms_accepted,
     });
     revalidatePath('/apply-organizer');
+
+    await sendAdminOrgAlert({
+      action: 'New organizer application submitted',
+      organizationName: data.organization_name,
+      contactEmail: data.email,
+      contactPhone: data.phone ?? null,
+      status: 'pending',
+      dashboardPath: '/admin/applications',
+    });
+
     return { success: true };
   } catch (err) {
     return {

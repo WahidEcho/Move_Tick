@@ -240,6 +240,120 @@ export function invitationTicketEmail(data: InvitationTicketEmailData): Rendered
   };
 }
 
+export interface OrgApprovedEmailData {
+  applicantName?: string | null;
+  organizationName: string;
+  dashboardUrl: string;
+}
+
+/** Sent to an applicant when their organizer application is approved. */
+export function orgApprovedEmail(data: OrgApprovedEmailData): RenderedEmail {
+  const greeting = data.applicantName ? `Hi ${escapeHtml(data.applicantName)},` : 'Hi,';
+  const inner = `
+    <tr><td style="padding:32px 32px 8px 32px;">
+      <p style="margin:0 0 4px 0;color:${BRAND_GREEN};font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Application approved</p>
+      <h1 style="margin:0 0 16px 0;color:${NEAR_BLACK};font-size:24px;line-height:1.25;">Welcome to Move-Tick, ${escapeHtml(data.organizationName)}</h1>
+      <p style="margin:0 0 24px 0;color:#374151;font-size:15px;line-height:1.6;">
+        ${greeting} great news — your organizer application for <strong>${escapeHtml(data.organizationName)}</strong> has been approved. You can now create and publish events on Move-Tick.
+      </p>
+      <div style="text-align:center;margin:0 0 8px 0;">
+        ${button(data.dashboardUrl, 'Go to your dashboard')}
+      </div>
+    </td></tr>`;
+  return { subject: `You're approved: ${data.organizationName} is live on Move-Tick`, html: shell(inner) };
+}
+
+export interface OrgRejectedEmailData {
+  applicantName?: string | null;
+  organizationName: string;
+  reason?: string | null;
+  contactEmail: string;
+}
+
+/** Sent to an applicant when their organizer application is rejected. */
+export function orgRejectedEmail(data: OrgRejectedEmailData): RenderedEmail {
+  const greeting = data.applicantName ? `Hi ${escapeHtml(data.applicantName)},` : 'Hi,';
+  const inner = `
+    <tr><td style="padding:32px 32px 8px 32px;">
+      <p style="margin:0 0 4px 0;color:#9ca3af;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Application update</p>
+      <h1 style="margin:0 0 16px 0;color:${NEAR_BLACK};font-size:24px;line-height:1.25;">About your Move-Tick application</h1>
+      <p style="margin:0 0 16px 0;color:#374151;font-size:15px;line-height:1.6;">
+        ${greeting} thanks for applying to organize events on Move-Tick as <strong>${escapeHtml(data.organizationName)}</strong>. After review, we're not able to approve this application right now.
+      </p>
+      ${data.reason ? `<div style="background:#f9fafb;border-left:3px solid #9ca3af;border-radius:8px;padding:14px 16px;margin:0 0 20px 0;"><p style="margin:0;color:#374151;font-size:14px;line-height:1.6;"><strong>Reason:</strong> ${escapeHtml(data.reason)}</p></div>` : ''}
+      <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">
+        Questions? Reply to this email or reach us at <a href="mailto:${data.contactEmail}" style="color:${BRAND_PURPLE};">${data.contactEmail}</a>.
+      </p>
+    </td></tr>`;
+  return { subject: `Update on your Move-Tick application`, html: shell(inner) };
+}
+
+export interface OrgMoreInfoEmailData {
+  applicantName?: string | null;
+  organizationName: string;
+  requested: string;
+  applyUrl: string;
+}
+
+/** Sent to an applicant when the admin needs more information before deciding. */
+export function orgMoreInfoEmail(data: OrgMoreInfoEmailData): RenderedEmail {
+  const greeting = data.applicantName ? `Hi ${escapeHtml(data.applicantName)},` : 'Hi,';
+  const inner = `
+    <tr><td style="padding:32px 32px 8px 32px;">
+      <p style="margin:0 0 4px 0;color:${BRAND_PURPLE};font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">A bit more info needed</p>
+      <h1 style="margin:0 0 16px 0;color:${NEAR_BLACK};font-size:24px;line-height:1.25;">Your Move-Tick application for ${escapeHtml(data.organizationName)}</h1>
+      <p style="margin:0 0 16px 0;color:#374151;font-size:15px;line-height:1.6;">
+        ${greeting} we're reviewing your organizer application and need a bit more information before we can proceed.
+      </p>
+      <div style="background:#f5f3ff;border-left:3px solid ${BRAND_PURPLE};border-radius:8px;padding:14px 16px;margin:0 0 24px 0;">
+        <p style="margin:0;color:#374151;font-size:14px;line-height:1.6;">${escapeHtml(data.requested)}</p>
+      </div>
+      <div style="text-align:center;margin:0 0 8px 0;">
+        ${button(data.applyUrl, 'Update your application')}
+      </div>
+    </td></tr>`;
+  return { subject: `Action needed: your Move-Tick application`, html: shell(inner) };
+}
+
+export interface AdminOrgAlertEmailData {
+  organizationName: string;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  /** Short human label, e.g. "New application submitted", "Organization suspended". */
+  action: string;
+  status?: string | null;
+  eventTitle?: string | null;
+  contractStatus?: string | null;
+  dashboardUrl: string;
+}
+
+/** Internal alert sent to the Move Beyond admin inbox for org lifecycle events. */
+export function adminOrgAlertEmail(data: AdminOrgAlertEmailData): RenderedEmail {
+  const row = (label: string, value?: string | null) =>
+    value
+      ? `<tr><td style="padding:4px 0;color:#6b7280;font-size:13px;width:140px;vertical-align:top;">${label}</td><td style="padding:4px 0;color:#374151;font-size:13px;font-weight:600;">${escapeHtml(value)}</td></tr>`
+      : '';
+  const whenLabel = new Date().toLocaleString('en-GB', { timeZone: 'Africa/Cairo' }) + ' (Cairo)';
+  const inner = `
+    <tr><td style="padding:32px 32px 8px 32px;">
+      <p style="margin:0 0 4px 0;color:${BRAND_PURPLE};font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Platform alert</p>
+      <h1 style="margin:0 0 16px 0;color:${NEAR_BLACK};font-size:22px;line-height:1.25;">${escapeHtml(data.action)}</h1>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px 0;">
+        ${row('Organization', data.organizationName)}
+        ${row('Contact email', data.contactEmail)}
+        ${row('Contact phone', data.contactPhone)}
+        ${row('Status', data.status)}
+        ${row('Event', data.eventTitle)}
+        ${row('Contract', data.contractStatus)}
+        ${row('When', whenLabel)}
+      </table>
+      <div style="text-align:center;margin:0 0 8px 0;">
+        ${button(data.dashboardUrl, 'Open admin dashboard')}
+      </div>
+    </td></tr>`;
+  return { subject: `[Move-Tick Admin] ${data.action}: ${data.organizationName}`, html: shell(inner) };
+}
+
 /** Email confirming an issued ticket, with a link to the wallet + QR attached. */
 export function ticketIssuedEmail(data: TicketEmailData): RenderedEmail {
   const locationLine = [data.venue, data.city]
