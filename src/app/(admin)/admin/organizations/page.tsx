@@ -1,6 +1,7 @@
 import { requireAdmin } from '@/lib/auth';
 import { getOrganizationsForAdmin } from '@/services/organizations.service';
 import { OrganizationsListClient } from './organizations-list-client';
+import { OrganizationsExportButton } from './export-button';
 import type { OrganizationStatus } from '@/types/database.types';
 
 interface OrganizationsPageProps {
@@ -30,11 +31,14 @@ export default async function OrganizationsPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">Organizations</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          View and manage all organizations on the platform.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Organizations</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            View and manage all organizations on the platform.
+          </p>
+        </div>
+        <OrganizationsExportButton />
       </div>
       <OrganizationsListClient result={result} searchParams={params} />
     </div>

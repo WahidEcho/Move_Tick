@@ -287,6 +287,13 @@ export function OrgRowActions({ org }: { org: OrganizationWithCounts }) {
               </div>
             </div>
           )}
+          <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3 text-sm">
+            <p className="font-medium text-foreground">Contract</p>
+            <p className="mt-1 text-muted-foreground">
+              Contract integration pending template. Once Mohamed provides the contract document, this panel will
+              show its status and a link to generate/send it via DocuSign.
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
 

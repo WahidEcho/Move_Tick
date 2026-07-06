@@ -8,10 +8,15 @@ import {
   adminArchiveOrganization,
   adminRestoreOrganization,
 } from '@/services/admin.service';
-import { getOrganizationMembers, type UpdateOrganizationData } from '@/services/organizations.service';
+import {
+  getOrganizationMembers,
+  getOrganizationsForAdmin,
+  type UpdateOrganizationData,
+} from '@/services/organizations.service';
 import { createNotification } from '@/services/notifications.service';
 import { sendAdminOrgAlert } from '@/services/admin-alerts.service';
 import { getOrganizerDashboardSummary } from '@/services/analytics.service';
+import { toCSV } from '@/lib/csv';
 import type { OrganizationStatus } from '@/types/database.types';
 import type { OrganizerDashboardSummary } from '@/types/domain.types';
 
@@ -137,4 +142,44 @@ export async function restoreOrganizationAction(orgId: string, reason?: string) 
 export async function getOrgStatsAction(orgId: string): Promise<OrganizerDashboardSummary> {
   await requireAdmin();
   return getOrganizerDashboardSummary(orgId);
+}
+
+export async function exportOrganizationsAction(): Promise<{ csv: string; error?: string }> {
+  await requireAdmin();
+  try {
+    const { data } = await getOrganizationsForAdmin({ page_size: 10000 });
+
+    const headers = [
+      'Name',
+      'Slug',
+      'Status',
+      'Contact Email',
+      'Contact Phone',
+      'Members',
+      'Events',
+      'Max Events',
+      'Commission %',
+      'Fixed Fee (EGP)',
+      'Archived',
+      'Created At',
+    ];
+    const rows = data.map((org) => [
+      org.name,
+      org.slug,
+      org.status,
+      org.contact_email ?? '',
+      org.contact_phone ?? '',
+      org.members_count,
+      org.events_count,
+      org.max_events ?? 'unlimited',
+      org.commission_percentage ?? '',
+      org.fixed_fee_egp ?? '',
+      org.archived_at ? 'yes' : 'no',
+      org.created_at,
+    ]);
+
+    return { csv: toCSV(headers, rows) };
+  } catch (e) {
+    return { csv: '', error: e instanceof Error ? e.message : 'Export failed' };
+  }
 }

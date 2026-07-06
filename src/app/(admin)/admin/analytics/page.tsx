@@ -5,6 +5,7 @@ import { getEventsForAdmin } from '@/services/events.service';
 import { StatCard } from '@/components/layout/stat-card';
 import { AnalyticsCharts } from './analytics-charts';
 import { AnalyticsFilters } from './analytics-filters';
+import { RevenueExportButton } from './revenue-export-button';
 import {
   FileText,
   Building2,
@@ -66,13 +67,16 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">
-          Platform Analytics
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Overview of platform usage and key metrics.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">
+            Platform Analytics
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Overview of platform usage and key metrics.
+          </p>
+        </div>
+        <RevenueExportButton />
       </div>
 
       <AnalyticsFilters
