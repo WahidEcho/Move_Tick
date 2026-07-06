@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase-server';
 import type {
   Organization,
   OrganizationMember,
+  OrganizationStatus,
   OrgRole,
 } from '@/types/database.types';
 import type { PaginatedResult } from '@/types/domain.types';
@@ -15,6 +16,7 @@ export type OrganizationWithRole = Organization & { role: OrgRole };
 export interface GetOrganizationsFilters {
   search?: string;
   is_active?: boolean;
+  status?: OrganizationStatus;
   page?: number;
   page_size?: number;
 }
@@ -31,6 +33,18 @@ export interface UpdateOrganizationData {
   city?: string | null;
   type?: string | null;
   is_active?: boolean;
+  status?: OrganizationStatus;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  max_events?: number | null;
+  max_published_events?: number | null;
+  can_create_paid?: boolean;
+  requires_publish_approval?: boolean;
+  commission_percentage?: number | null;
+  fixed_fee_egp?: number | null;
+  suspended_reason?: string | null;
+  hide_events_on_suspend?: boolean;
+  archived_at?: string | null;
 }
 
 export async function getOrganization(id: string): Promise<Organization | null> {
@@ -72,12 +86,16 @@ export async function getOrganizations(
   filters: GetOrganizationsFilters = {}
 ): Promise<PaginatedResult<Organization>> {
   const supabase = createServiceClient();
-  const { search, is_active, page = 1, page_size = 20 } = filters;
+  const { search, is_active, status, page = 1, page_size = 20 } = filters;
 
   let query = supabase.from('organizations').select('*', { count: 'exact' });
 
   if (is_active !== undefined) {
     query = query.eq('is_active', is_active);
+  }
+
+  if (status) {
+    query = query.eq('status', status);
   }
 
   if (search && search.trim()) {

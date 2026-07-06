@@ -6,6 +6,7 @@ import { DataTable } from '@/components/tables/data-table';
 import { TableFilters } from '@/components/tables/table-filters';
 import { Pagination } from '@/components/tables/pagination';
 import { Badge } from '@/components/ui/badge';
+import { OrgRowActions } from './org-row-actions';
 import type { OrganizationWithCounts } from '@/services/organizations.service';
 import type { PaginatedResult } from '@/types/domain.types';
 import { Building2 } from 'lucide-react';
@@ -13,8 +14,19 @@ import { Building2 } from 'lucide-react';
 const STATUS_FILTER_OPTIONS = [
   { label: 'All', value: '' },
   { label: 'Active', value: 'active' },
-  { label: 'Inactive', value: 'inactive' },
+  { label: 'Suspended', value: 'suspended' },
+  { label: 'On hold', value: 'on_hold' },
+  { label: 'Pending', value: 'pending' },
+  { label: 'Rejected', value: 'rejected' },
 ];
+
+const STATUS_BADGE_CLASSES: Record<string, string> = {
+  active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  suspended: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  on_hold: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+  pending: 'bg-muted text-muted-foreground',
+  rejected: 'bg-muted text-muted-foreground',
+};
 
 interface OrganizationsListClientProps {
   result: PaginatedResult<OrganizationWithCounts>;
@@ -72,11 +84,6 @@ export function OrganizationsListClient({
       ),
     },
     {
-      key: 'owner',
-      label: 'Owner',
-      render: () => <span className="text-muted-foreground">—</span>,
-    },
-    {
       key: 'members_count',
       label: 'Members',
       render: (row: OrganizationWithCounts) => row.members_count,
@@ -90,16 +97,16 @@ export function OrganizationsListClient({
       key: 'status',
       label: 'Status',
       render: (row: OrganizationWithCounts) => (
-        <Badge
-          variant="outline"
-          className={
-            row.is_active
-              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-              : 'bg-muted text-muted-foreground'
-          }
-        >
-          {row.is_active ? 'Active' : 'Inactive'}
-        </Badge>
+        <div className="flex flex-wrap gap-1">
+          <Badge variant="outline" className={STATUS_BADGE_CLASSES[row.status] ?? 'bg-muted text-muted-foreground'}>
+            {row.status.replace('_', ' ')}
+          </Badge>
+          {row.archived_at && (
+            <Badge variant="outline" className="bg-muted text-muted-foreground">
+              Deleted
+            </Badge>
+          )}
+        </div>
       ),
     },
     {
@@ -111,6 +118,12 @@ export function OrganizationsListClient({
           month: 'short',
           day: 'numeric',
         }),
+    },
+    {
+      key: 'actions',
+      label: '',
+      className: 'w-10 text-right',
+      render: (row: OrganizationWithCounts) => <OrgRowActions org={row} />,
     },
   ];
 

@@ -1,6 +1,7 @@
 import { requireAdmin } from '@/lib/auth';
 import { getOrganizationsForAdmin } from '@/services/organizations.service';
 import { OrganizationsListClient } from './organizations-list-client';
+import type { OrganizationStatus } from '@/types/database.types';
 
 interface OrganizationsPageProps {
   searchParams: Promise<{
@@ -17,13 +18,12 @@ export default async function OrganizationsPage({
 
   const params = await searchParams;
   const search = params.search ?? '';
-  const isActive =
-    params.status === 'active' ? true : params.status === 'inactive' ? false : undefined;
+  const status = (params.status || undefined) as OrganizationStatus | undefined;
   const page = Number(params.page) || 1;
 
   const result = await getOrganizationsForAdmin({
     search: search || undefined,
-    is_active: isActive,
+    status,
     page,
     page_size: 20,
   });
