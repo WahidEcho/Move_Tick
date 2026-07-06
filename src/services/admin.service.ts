@@ -1,7 +1,18 @@
 import { createServiceClient } from '@/lib/supabase-server';
 import { logAdminAction } from './audit.service';
-import { updateOrganization, type UpdateOrganizationData } from './organizations.service';
-import type { Event, Json, Organization, OrganizationStatus } from '@/types/database.types';
+import { updateOrganization, addOrganizationMember, type UpdateOrganizationData } from './organizations.service';
+import { assignEventStaff } from './team.service';
+import type {
+  Event,
+  EventStaffAssignment,
+  EventStaffRole,
+  Json,
+  Organization,
+  OrganizationStatus,
+  OrgRole,
+  Profile,
+  UserRole,
+} from '@/types/database.types';
 
 /**
  * Super-admin mutations for events. Every function assumes the caller has
@@ -341,4 +352,171 @@ export async function adminRestoreOrganization(
   });
 
   return data as Organization;
+}
+
+/**
+ * Super-admin mutations for users. Same pattern: pure mutation + audit_log
+ * entry, no auth check (actions.ts already called requireAdmin()).
+ */
+
+async function getProfileRow(id: string): Promise<Profile | null> {
+  const supabase = createServiceClient();
+  const { data } = await supabase.from('profiles').select('*').eq('id', id).maybeSingle();
+  return data as Profile | null;
+}
+
+export async function adminUpdateUser(
+  userId: string,
+  data: { full_name?: string | null; phone?: string | null },
+  actorId: string,
+  reason?: string | null
+): Promise<Profile> {
+  const supabase = createServiceClient();
+  const before = await getProfileRow(userId);
+
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .update({ ...data, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update user: ${error.message}`);
+
+  await logAdminAction({
+    actorId,
+    action: 'user.update',
+    targetType: 'profile',
+    targetId: userId,
+    previousValue: { full_name: before?.full_name ?? null, phone: before?.phone ?? null },
+    newValue: data,
+    reason: reason ?? null,
+  });
+
+  return profile as Profile;
+}
+
+export async function adminSetUserRole(
+  userId: string,
+  role: UserRole,
+  actorId: string,
+  reason?: string | null
+): Promise<Profile> {
+  const supabase = createServiceClient();
+  const before = await getProfileRow(userId);
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ platform_role: role, updated_at: new Date().toISOString() })
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to change user role: ${error.message}`);
+
+  await logAdminAction({
+    actorId,
+    action: 'user.set_role',
+    targetType: 'profile',
+    targetId: userId,
+    previousValue: { platform_role: before?.platform_role ?? null },
+    newValue: { platform_role: role },
+    reason: reason ?? null,
+  });
+
+  return data as Profile;
+}
+
+/** Disables/enables a user account: flags the profile AND bans/unbans them at the Supabase Auth level so they can't sign in while disabled. */
+export async function adminSetUserDisabled(
+  userId: string,
+  disabled: boolean,
+  actorId: string,
+  reason?: string | null
+): Promise<Profile> {
+  const supabase = createServiceClient();
+  const before = await getProfileRow(userId);
+
+  // Go's time.ParseDuration overflows past ~292 years — 876000h (100 years)
+  // is Supabase's own documented convention for an effectively permanent ban.
+  const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
+    ban_duration: disabled ? '876000h' : 'none',
+  });
+  if (authError) throw new Error(`Failed to ${disabled ? 'disable' : 'enable'} user auth: ${authError.message}`);
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({
+      is_disabled: disabled,
+      disabled_at: disabled ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to ${disabled ? 'disable' : 'enable'} user: ${error.message}`);
+
+  await logAdminAction({
+    actorId,
+    action: disabled ? 'user.disable' : 'user.enable',
+    targetType: 'profile',
+    targetId: userId,
+    previousValue: { is_disabled: before?.is_disabled ?? null },
+    newValue: { is_disabled: disabled },
+    reason: reason ?? null,
+  });
+
+  return data as Profile;
+}
+
+/** Adds a user to an organization (or updates their role if already a member). */
+export async function adminAssignUserToOrg(
+  userId: string,
+  organizationId: string,
+  role: OrgRole,
+  actorId: string
+): Promise<void> {
+  const supabase = createServiceClient();
+  const { data: existing } = await supabase
+    .from('organization_members')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase.from('organization_members').update({ role }).eq('id', existing.id);
+    if (error) throw new Error(`Failed to update organization role: ${error.message}`);
+  } else {
+    await addOrganizationMember(organizationId, userId, role);
+  }
+
+  await logAdminAction({
+    actorId,
+    action: 'user.assign_to_org',
+    targetType: 'profile',
+    targetId: userId,
+    newValue: { organization_id: organizationId, role },
+  });
+}
+
+/** Assigns a user (by email) as co-organizer staff on any event. */
+export async function adminAssignUserToEventTeam(
+  email: string,
+  eventId: string,
+  organizationId: string,
+  role: EventStaffRole,
+  actorId: string
+): Promise<EventStaffAssignment> {
+  const assignment = await assignEventStaff(eventId, organizationId, email, role);
+
+  await logAdminAction({
+    actorId,
+    action: 'user.assign_to_event_team',
+    targetType: 'profile',
+    newValue: { email, event_id: eventId, role },
+  });
+
+  return assignment;
 }

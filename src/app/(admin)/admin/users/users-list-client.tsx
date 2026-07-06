@@ -6,6 +6,7 @@ import { DataTable } from '@/components/tables/data-table';
 import { TableFilters } from '@/components/tables/table-filters';
 import { Pagination } from '@/components/tables/pagination';
 import { Badge } from '@/components/ui/badge';
+import { UserRowActions } from './user-row-actions';
 import type { Profile } from '@/types/database.types';
 import type { PaginatedResult } from '@/types/domain.types';
 import { Users } from 'lucide-react';
@@ -91,15 +92,22 @@ export function UsersListClient({
       key: 'platform_role',
       label: 'Platform Role',
       render: (row: Profile) => (
-        <Badge
-          variant="outline"
-          className={
-            ROLE_BADGE_CLASSES[row.platform_role] ??
-            'bg-muted text-muted-foreground'
-          }
-        >
-          {row.platform_role.charAt(0).toUpperCase() + row.platform_role.slice(1)}
-        </Badge>
+        <div className="flex flex-wrap gap-1">
+          <Badge
+            variant="outline"
+            className={
+              ROLE_BADGE_CLASSES[row.platform_role] ??
+              'bg-muted text-muted-foreground'
+            }
+          >
+            {row.platform_role.charAt(0).toUpperCase() + row.platform_role.slice(1)}
+          </Badge>
+          {row.is_disabled && (
+            <Badge variant="outline" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+              Disabled
+            </Badge>
+          )}
+        </div>
       ),
     },
     {
@@ -111,6 +119,12 @@ export function UsersListClient({
           month: 'short',
           day: 'numeric',
         }),
+    },
+    {
+      key: 'actions',
+      label: '',
+      className: 'w-10 text-right',
+      render: (row: Profile) => <UserRowActions user={row} />,
     },
   ];
 
