@@ -3,6 +3,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { getEventBySlug, getEventStats } from '@/services/events.service';
 import { getTicketTypes } from '@/services/tickets.service';
+import { getProfile, getOrgRole, getEventStaffRole } from '@/lib/auth';
+import { getExpiryThresholdISO, isExpired } from '@/lib/event-visibility';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,6 +32,33 @@ export default async function EventPage({ params }: EventPageProps) {
 
   if (!event || event.is_cancelled) {
     notFound();
+  }
+
+  // Auto-expiry + manual hide/archive: hidden from the public, but the
+  // owning organization, its assigned staff, or a platform admin can still
+  // open the page directly (they just see an status badge instead).
+  const threshold = await getExpiryThresholdISO();
+  const hasEnded = isExpired(event, threshold);
+  const isHidden = event.is_hidden || Boolean(event.archived_at);
+  let statusBadge: string | null = null;
+
+  if (hasEnded || isHidden) {
+    const profile = await getProfile();
+    let hasAccess = false;
+    if (profile) {
+      if (profile.platform_role === 'admin') {
+        hasAccess = true;
+      } else {
+        const [orgRole, staffRole] = await Promise.all([
+          getOrgRole(profile.id, event.organization_id),
+          getEventStaffRole(profile.id, event.id),
+        ]);
+        hasAccess = Boolean(orgRole) || Boolean(staffRole);
+      }
+    }
+    if (!hasAccess) notFound();
+
+    statusBadge = event.archived_at ? 'Archived' : event.is_hidden ? 'Hidden' : 'Ended';
   }
 
   const [ticketTypes, stats] = await Promise.all([
@@ -72,10 +101,15 @@ export default async function EventPage({ params }: EventPageProps) {
           <div className="flex-1 space-y-6">
             {/* Header */}
             <div>
-              {event.category && (
-                <Badge variant="secondary" className="mb-2">
-                  {event.category}
-                </Badge>
+              {(event.category || statusBadge) && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {event.category && <Badge variant="secondary">{event.category}</Badge>}
+                  {statusBadge && (
+                    <Badge variant="outline" className="border-amber-500/40 text-amber-600 dark:text-amber-400">
+                      {statusBadge}
+                    </Badge>
+                  )}
+                </div>
               )}
               <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
                 {event.title}

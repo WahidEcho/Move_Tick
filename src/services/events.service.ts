@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase-server';
+import { getExpiryThresholdISO } from '@/lib/event-visibility';
 import type {
   Event,
   EventSettings,
@@ -67,6 +68,12 @@ export interface GetEventsFilters {
   is_published?: boolean;
   page?: number;
   page_size?: number;
+  /**
+   * Public-discovery gate: excludes cancelled/hidden/archived/expired events
+   * (end_date past the expiry buffer). Set internally by getPublicEvents —
+   * admin/organizer listings never set this so they keep seeing everything.
+   */
+  excludeExpiredAndHidden?: boolean;
 }
 
 export interface GetOrganizationEventsFilters {
@@ -194,6 +201,7 @@ export async function getEvents(
     search,
     visibility,
     is_published,
+    excludeExpiredAndHidden,
     page = 1,
     page_size = 20,
   } = filters;
@@ -217,6 +225,14 @@ export async function getEvents(
     query = query.or(
       `title.ilike.%${search.trim()}%,description.ilike.%${search.trim()}%,venue.ilike.%${search.trim()}%`
     );
+  }
+  if (excludeExpiredAndHidden) {
+    const threshold = await getExpiryThresholdISO();
+    query = query
+      .eq('is_cancelled', false)
+      .eq('is_hidden', false)
+      .is('archived_at', null)
+      .gte('end_date', threshold);
   }
 
   const from = (page - 1) * page_size;
@@ -244,6 +260,7 @@ export async function getPublicEvents(
     ...filters,
     is_published: true,
     visibility: 'public',
+    excludeExpiredAndHidden: true,
   });
 }
 
