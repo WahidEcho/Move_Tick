@@ -1,44 +1,40 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart3 } from 'lucide-react';
+import { LineChart } from '@/components/charts/line-chart';
+import { LineChart as LineChartIcon } from 'lucide-react';
+import type { RegistrationTrendPoint } from '@/services/analytics.service';
 
-const PLACEHOLDER_DATA = [
-  { label: 'Applications', value: 0 },
-  { label: 'Organizations', value: 0 },
-  { label: 'Events', value: 0 },
-  { label: 'Registrations', value: 0 },
-];
+interface AnalyticsChartsProps {
+  data: RegistrationTrendPoint[];
+}
 
-export function AnalyticsCharts() {
+export function AnalyticsCharts({ data }: AnalyticsChartsProps) {
+  const hasData = data.some((d) => d.count > 0);
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <BarChart3 className="size-4" />
-          Growth Overview
+          <LineChartIcon className="size-4" />
+          Registrations over time
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Chart placeholder — connect to analytics data source for trends over time.
+          Matches the filters above — organization, event, status, and ticket type.
         </p>
       </CardHeader>
       <CardContent>
-        <div className="flex h-64 items-center justify-center rounded-lg border border-dashed border-border bg-muted/30">
-          <div className="flex flex-col items-center gap-2 text-center text-muted-foreground">
-            <BarChart3 className="size-12 opacity-50" />
-            <p className="text-sm font-medium">Chart coming soon</p>
-            <p className="text-xs">
-              BarChart component with placeholder data structure
-            </p>
-            <div className="mt-2 flex gap-4 text-xs">
-              {PLACEHOLDER_DATA.map((d) => (
-                <span key={d.label}>
-                  {d.label}: {d.value}
-                </span>
-              ))}
+        {hasData ? (
+          <LineChart data={data.map((d) => ({ date: d.date, value: d.count }))} height={280} />
+        ) : (
+          <div className="flex h-64 items-center justify-center rounded-lg border border-dashed border-border bg-muted/30">
+            <div className="flex flex-col items-center gap-2 text-center text-muted-foreground">
+              <LineChartIcon className="size-10 opacity-50" />
+              <p className="text-sm font-medium">No registrations in this range</p>
+              <p className="text-xs">Try a wider date range or clear the filters above.</p>
             </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

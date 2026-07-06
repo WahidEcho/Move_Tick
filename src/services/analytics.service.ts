@@ -186,29 +186,100 @@ export async function getEventAnalytics(eventId: string): Promise<EventAnalytics
   };
 }
 
-export async function getPlatformAnalytics(): Promise<PlatformAnalytics> {
-  const supabase = createServiceClient();
+export interface PlatformAnalyticsFilters {
+  /** ISO date (inclusive) — applied to each metric's own created_at. */
+  dateFrom?: string;
+  dateTo?: string;
+  organizationId?: string;
+  eventId?: string;
+  status?: 'published' | 'draft' | 'cancelled';
+  ticketType?: 'paid' | 'free';
+}
 
-  const [appsResult, appsPendingResult, orgsResult, eventsResult, regsResult] = await Promise.all([
-    supabase.from('organizer_applications').select('id', { count: 'exact', head: true }),
-    supabase.from('organizer_applications').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabase.from('organizations').select('id', { count: 'exact', head: true }).eq('is_active', true),
-    supabase.from('events').select('id', { count: 'exact', head: true }),
-    supabase.from('registrations').select('id', { count: 'exact', head: true }),
+type FilteredRegistrationRow = {
+  id: string;
+  user_id: string;
+  status: string;
+  created_at: string;
+  event: { organization_id: string; is_published: boolean; is_cancelled: boolean } | null;
+  ticket_type: { price: number } | null;
+};
+
+/** Shared registrations query for every filter dimension analytics needs. */
+async function getFilteredRegistrations(filters: PlatformAnalyticsFilters): Promise<FilteredRegistrationRow[]> {
+  const supabase = createServiceClient();
+  const { dateFrom, dateTo, organizationId, eventId, status, ticketType } = filters;
+
+  let query = supabase
+    .from('registrations')
+    .select(
+      'id, user_id, status, created_at, event:events!inner(organization_id, is_published, is_cancelled), ticket_type:ticket_types!inner(price)'
+    );
+
+  if (organizationId) query = query.eq('event.organization_id', organizationId);
+  if (eventId) query = query.eq('event_id', eventId);
+  if (status === 'published') query = query.eq('event.is_published', true).eq('event.is_cancelled', false);
+  if (status === 'draft') query = query.eq('event.is_published', false).eq('event.is_cancelled', false);
+  if (status === 'cancelled') query = query.eq('event.is_cancelled', true);
+  if (ticketType === 'paid') query = query.gt('ticket_type.price', 0);
+  if (ticketType === 'free') query = query.eq('ticket_type.price', 0);
+  if (dateFrom) query = query.gte('created_at', dateFrom);
+  if (dateTo) query = query.lte('created_at', dateTo);
+
+  const { data, error } = await query;
+  if (error) throw new Error(`Failed to fetch registrations: ${error.message}`);
+  return (data ?? []) as unknown as FilteredRegistrationRow[];
+}
+
+export async function getPlatformAnalytics(filters: PlatformAnalyticsFilters = {}): Promise<PlatformAnalytics> {
+  const supabase = createServiceClient();
+  const { dateFrom, dateTo, organizationId, eventId, status } = filters;
+
+  let appsQuery = supabase.from('organizer_applications').select('id', { count: 'exact', head: true });
+  let appsPendingQuery = supabase
+    .from('organizer_applications')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'pending');
+  if (dateFrom) {
+    appsQuery = appsQuery.gte('created_at', dateFrom);
+    appsPendingQuery = appsPendingQuery.gte('created_at', dateFrom);
+  }
+  if (dateTo) {
+    appsQuery = appsQuery.lte('created_at', dateTo);
+    appsPendingQuery = appsPendingQuery.lte('created_at', dateTo);
+  }
+
+  let orgsQuery = supabase.from('organizations').select('id', { count: 'exact', head: true }).eq('is_active', true);
+  if (organizationId) orgsQuery = orgsQuery.eq('id', organizationId);
+  if (dateFrom) orgsQuery = orgsQuery.gte('created_at', dateFrom);
+  if (dateTo) orgsQuery = orgsQuery.lte('created_at', dateTo);
+
+  let eventsQuery = supabase.from('events').select('id', { count: 'exact', head: true });
+  if (organizationId) eventsQuery = eventsQuery.eq('organization_id', organizationId);
+  if (eventId) eventsQuery = eventsQuery.eq('id', eventId);
+  if (status === 'published') eventsQuery = eventsQuery.eq('is_published', true).eq('is_cancelled', false);
+  if (status === 'draft') eventsQuery = eventsQuery.eq('is_published', false).eq('is_cancelled', false);
+  if (status === 'cancelled') eventsQuery = eventsQuery.eq('is_cancelled', true);
+  if (dateFrom) eventsQuery = eventsQuery.gte('created_at', dateFrom);
+  if (dateTo) eventsQuery = eventsQuery.lte('created_at', dateTo);
+
+  const [appsResult, appsPendingResult, orgsResult, eventsResult, registrations] = await Promise.all([
+    appsQuery,
+    appsPendingQuery,
+    orgsQuery,
+    eventsQuery,
+    getFilteredRegistrations(filters),
   ]);
 
   const total_applications = appsResult.count ?? 0;
   const pending_applications = appsPendingResult.count ?? 0;
   const total_organizations = orgsResult.count ?? 0;
   const total_events = eventsResult.count ?? 0;
-  const total_registrations = regsResult.count ?? 0;
+  const total_registrations = registrations.length;
 
-  const { data: distinctAttendees } = await supabase
-    .from('registrations')
-    .select('user_id')
-    .in('status', ['approved', 'confirmed']);
-
-  const uniqueAttendees = new Set((distinctAttendees ?? []).map((r) => r.user_id));
+  const uniqueAttendees = new Set(
+    registrations.filter((r) => ['approved', 'confirmed'].includes(r.status)).map((r) => r.user_id)
+  );
   const total_attendees = uniqueAttendees.size;
 
   return {
@@ -219,6 +290,39 @@ export async function getPlatformAnalytics(): Promise<PlatformAnalytics> {
     total_attendees,
     total_registrations,
   };
+}
+
+/** Platform-wide registrations-per-day, honoring the same filters as getPlatformAnalytics. */
+export async function getPlatformRegistrationTrend(
+  filters: PlatformAnalyticsFilters = {},
+  days: number = 30
+): Promise<RegistrationTrendPoint[]> {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  const startStr = startDate.toISOString().split('T')[0];
+
+  const registrations = await getFilteredRegistrations({
+    ...filters,
+    dateFrom: filters.dateFrom ?? startStr,
+  });
+
+  const byDate = new Map<string, number>();
+  for (let d = 0; d <= days; d++) {
+    const dt = new Date(startDate);
+    dt.setDate(dt.getDate() + d);
+    byDate.set(dt.toISOString().split('T')[0], 0);
+  }
+
+  for (const r of registrations) {
+    const date = r.created_at.split('T')[0];
+    if (byDate.has(date)) {
+      byDate.set(date, (byDate.get(date) ?? 0) + 1);
+    }
+  }
+
+  return Array.from(byDate.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, count]) => ({ date, count }));
 }
 
 export async function getOrganizerDashboardSummary(orgId: string): Promise<OrganizerDashboardSummary> {
