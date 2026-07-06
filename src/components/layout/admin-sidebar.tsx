@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Menu } from 'lucide-react';
 import {
+  LayoutDashboard,
   FileText,
   Building2,
   CalendarDays,
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react';
 
 const adminNavItems = [
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/applications', label: 'Applications', icon: FileText },
   { href: '/admin/organizations', label: 'Organizations', icon: Building2 },
   { href: '/admin/events', label: 'Events', icon: CalendarDays },
@@ -62,7 +64,9 @@ export function AdminSidebar() {
           {adminNavItems.map((item) => {
             const Icon = item.icon;
             const isActive =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
+              item.href === '/admin'
+                ? pathname === '/admin'
+                : pathname === item.href || pathname.startsWith(`${item.href}/`);
 
             const linkContent = (
               <Link
