@@ -354,6 +354,71 @@ export function adminOrgAlertEmail(data: AdminOrgAlertEmailData): RenderedEmail 
   return { subject: `[Move-Tick Admin] ${data.action}: ${data.organizationName}`, html: shell(inner) };
 }
 
+export interface SettlementStatementEmailData {
+  organizationName: string;
+  eventTitle: string;
+  eventDateLabel?: string | null;
+  paidTicketCount: number;
+  grossTicketRevenue: number;
+  appliedCommissionPercentage: number;
+  percentageCommissionAmount: number;
+  fixedFeePerPaidTicket: number;
+  fixedTicketFeeAmount: number;
+  totalPlatformFees: number;
+  organizerNetProfit: number;
+  amountPaid: number;
+  remainingBalance: number;
+  paymentDateLabel?: string | null;
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
+  invoiceNumber: string;
+  contactEmail: string;
+}
+
+function moneyLabel(n: number): string {
+  return `EGP ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** Settlement statement email: full financial breakdown for a recorded organizer payout, PDF attached. */
+export function settlementStatementEmail(data: SettlementStatementEmailData): RenderedEmail {
+  const row = (label: string, value: string, boldValue?: boolean) =>
+    `<tr>
+      <td style="padding:6px 0;color:#6b7280;font-size:13px;">${escapeHtml(label)}</td>
+      <td style="padding:6px 0;color:#374151;font-size:13px;text-align:right;font-weight:${boldValue ? 700 : 400};">${escapeHtml(value)}</td>
+    </tr>`;
+  const inner = `
+    <tr><td style="padding:32px 32px 8px 32px;">
+      <p style="margin:0 0 4px 0;color:${BRAND_PURPLE};font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Settlement statement</p>
+      <h1 style="margin:0 0 4px 0;color:${NEAR_BLACK};font-size:22px;line-height:1.25;">${escapeHtml(data.eventTitle)}</h1>
+      <p style="margin:0 0 20px 0;color:#6b7280;font-size:14px;">${escapeHtml(data.organizationName)}${data.eventDateLabel ? ` · ${escapeHtml(data.eventDateLabel)}` : ''}</p>
+      <p style="margin:0 0 20px 0;color:#9ca3af;font-size:12px;">Invoice ${escapeHtml(data.invoiceNumber)}</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 8px 0;border-top:1px solid #eee;padding-top:12px;">
+        ${row('Paid tickets sold', String(data.paidTicketCount))}
+        ${row('Gross ticket revenue', moneyLabel(data.grossTicketRevenue), true)}
+      </table>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:8px 0;border-top:1px solid #eee;padding-top:12px;">
+        ${row(`Commission (${data.appliedCommissionPercentage}%)`, moneyLabel(data.percentageCommissionAmount))}
+        ${row(`Fixed fee (${moneyLabel(data.fixedFeePerPaidTicket)} × ${data.paidTicketCount})`, moneyLabel(data.fixedTicketFeeAmount))}
+        ${row('Total platform fees', moneyLabel(data.totalPlatformFees), true)}
+      </table>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:8px 0;border-top:1px solid #eee;padding-top:12px;">
+        ${row('Organizer net profit', moneyLabel(data.organizerNetProfit), true)}
+        ${row('Amount paid to date', moneyLabel(data.amountPaid))}
+        ${row('Remaining balance', moneyLabel(data.remainingBalance), true)}
+      </table>
+      ${data.paymentDateLabel || data.paymentMethod || data.paymentReference ? `
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:8px 0 24px 0;border-top:1px solid #eee;padding-top:12px;">
+        ${data.paymentDateLabel ? row('Payment date', data.paymentDateLabel) : ''}
+        ${data.paymentMethod ? row('Method', data.paymentMethod) : ''}
+        ${data.paymentReference ? row('Reference', data.paymentReference) : ''}
+      </table>` : '<div style="margin:0 0 24px 0;"></div>'}
+      <p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.5;">
+        The full breakdown is attached as a PDF. Questions? Reach us at ${escapeHtml(data.contactEmail)}.
+      </p>
+    </td></tr>`;
+  return { subject: `Event Settlement Statement — ${data.eventTitle}`, html: shell(inner) };
+}
+
 /** Email confirming an issued ticket, with a link to the wallet + QR attached. */
 export function ticketIssuedEmail(data: TicketEmailData): RenderedEmail {
   const locationLine = [data.venue, data.city]

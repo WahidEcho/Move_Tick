@@ -1,6 +1,12 @@
+import { format } from 'date-fns';
 import { createServiceClient } from '@/lib/supabase-server';
 import { getPlatformSettings } from './platform-settings.service';
 import { logAdminAction } from './audit.service';
+import { sendLoggedEmail } from './email-log.service';
+import { createNotification } from './notifications.service';
+import { sendAdminOrgAlert } from './admin-alerts.service';
+import { settlementStatementEmail } from '@/lib/email-templates';
+import { generateSettlementPdf, settlementPdfFilename } from '@/lib/settlement-pdf';
 import type {
   CommissionSource,
   EventCommissionSettings,
@@ -633,4 +639,215 @@ export async function getPayoutHistory(settlementId: string): Promise<OrganizerP
     .order('payment_date', { ascending: false });
   if (error) throw new Error(`Failed to fetch payout history: ${error.message}`);
   return (data ?? []) as OrganizerPayoutRecord[];
+}
+
+export interface SendSettlementStatementResult {
+  ok: boolean;
+  invoiceNumber: string | null;
+  recipientsSent: string[];
+  recipientsFailed: string[];
+}
+
+/**
+ * Generates (or reuses, on resend) an invoice number, renders the settlement
+ * PDF + email, sends it to the org's contact email and owner account email
+ * (deduplicated), logs every recipient attempt, notifies the org in-app, and
+ * alerts the Move Beyond inbox. Callers decide *when* this runs — it is never
+ * triggered automatically before an admin has recorded a real payout.
+ */
+export async function sendSettlementStatement(
+  settlementId: string,
+  opts: { payoutRecordId?: string | null; isResend?: boolean } = {}
+): Promise<SendSettlementStatementResult> {
+  const supabase = createServiceClient();
+
+  const { data: settlement } = await supabase
+    .from('event_financial_settlements')
+    .select('*, event:events(title, start_date), organization:organizations(id, name, contact_email)')
+    .eq('id', settlementId)
+    .single();
+  if (!settlement) return { ok: false, invoiceNumber: null, recipientsSent: [], recipientsFailed: [] };
+
+  const event = settlement.event as { title: string; start_date: string } | null;
+  const organization = settlement.organization as { id: string; name: string; contact_email: string | null } | null;
+  if (!event || !organization) return { ok: false, invoiceNumber: null, recipientsSent: [], recipientsFailed: [] };
+
+  let payout: OrganizerPayoutRecord | null = null;
+  if (opts.payoutRecordId) {
+    const { data } = await supabase.from('organizer_payout_records').select('*').eq('id', opts.payoutRecordId).maybeSingle();
+    payout = data as OrganizerPayoutRecord | null;
+  } else {
+    const { data } = await supabase
+      .from('organizer_payout_records')
+      .select('*')
+      .eq('settlement_id', settlementId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    payout = data as OrganizerPayoutRecord | null;
+  }
+
+  // Resends reuse the invoice number already assigned to that payout; a new
+  // payout (or a settlement with no payout yet) mints a fresh one.
+  let invoiceNumber: string | null = null;
+  if (payout) {
+    const { data: existingLog } = await supabase
+      .from('settlement_invoice_logs')
+      .select('invoice_number')
+      .eq('payout_record_id', payout.id)
+      .limit(1)
+      .maybeSingle();
+    invoiceNumber = existingLog?.invoice_number ?? null;
+  }
+  if (!invoiceNumber) {
+    const { data: seqResult, error: seqErr } = await supabase.rpc('next_settlement_invoice_number');
+    if (seqErr || !seqResult) {
+      return { ok: false, invoiceNumber: null, recipientsSent: [], recipientsFailed: [] };
+    }
+    invoiceNumber = seqResult as string;
+  }
+
+  const platformSettings = await getPlatformSettings();
+  const dateLabel = event.start_date ? format(new Date(event.start_date), 'EEE, MMM d, yyyy') : null;
+  const paymentDateLabel = payout ? format(new Date(payout.payment_date), 'EEE, MMM d, yyyy') : null;
+
+  const pdfInput = {
+    invoiceNumber,
+    organizationName: organization.name,
+    eventTitle: event.title,
+    eventDateLabel: dateLabel,
+    paidTicketCount: settlement.paid_ticket_count as number,
+    grossTicketRevenue: Number(settlement.gross_ticket_revenue),
+    appliedCommissionPercentage: Number(settlement.applied_commission_percentage),
+    percentageCommissionAmount: Number(settlement.percentage_commission_amount),
+    fixedFeePerPaidTicket: Number(settlement.fixed_fee_per_paid_ticket),
+    fixedTicketFeeAmount: Number(settlement.fixed_ticket_fee_amount),
+    totalPlatformFees: Number(settlement.total_platform_fees),
+    organizerNetProfit: Number(settlement.organizer_net_profit),
+    amountPaid: Number(settlement.amount_paid_to_organizer),
+    remainingBalance: Number(settlement.remaining_amount_due),
+    paymentDateLabel,
+    paymentMethod: payout?.payment_method ?? null,
+    paymentReference: payout?.payment_reference ?? null,
+    contactEmail: platformSettings.support_email,
+  };
+
+  let pdfBase64: string | null = null;
+  try {
+    const pdfBytes = await generateSettlementPdf(pdfInput);
+    pdfBase64 = Buffer.from(pdfBytes).toString('base64');
+  } catch (e) {
+    console.error('[settlements] statement PDF generation failed:', e);
+  }
+
+  const { data: ownerMember } = await supabase
+    .from('organization_members')
+    .select('profile:profiles(email)')
+    .eq('organization_id', organization.id)
+    .eq('role', 'owner')
+    .limit(1)
+    .maybeSingle();
+  const ownerEmail = (ownerMember?.profile as { email?: string } | null)?.email ?? null;
+  const recipients = Array.from(new Set([organization.contact_email, ownerEmail].filter((e): e is string => Boolean(e))));
+
+  if (recipients.length === 0) {
+    await logAdminAction({
+      actorId: null,
+      action: 'settlement.statement_failed',
+      targetType: 'event_financial_settlement',
+      targetId: settlementId,
+      reason: 'No recipient email on file (no org contact_email, no owner account)',
+    });
+    return { ok: false, invoiceNumber, recipientsSent: [], recipientsFailed: [] };
+  }
+
+  const { subject, html } = settlementStatementEmail({ ...pdfInput, invoiceNumber });
+  const filename = settlementPdfFilename(organization.name, event.title);
+
+  const recipientsSent: string[] = [];
+  const recipientsFailed: string[] = [];
+
+  for (const to of recipients) {
+    const result = await sendLoggedEmail({
+      to,
+      subject,
+      html,
+      attachments: pdfBase64 ? [{ filename, content: pdfBase64 }] : undefined,
+      emailType: 'settlement_statement',
+      relatedOrganizationId: organization.id,
+      relatedEventId: settlement.event_id as string,
+    });
+
+    await supabase.from('settlement_invoice_logs').insert({
+      event_id: settlement.event_id,
+      organization_id: organization.id,
+      settlement_id: settlementId,
+      payout_record_id: payout?.id ?? null,
+      invoice_number: invoiceNumber,
+      invoice_status: result.ok ? (opts.isResend ? 'resent' : 'sent') : 'failed',
+      recipient_email: to,
+      email_sent_at: result.ok ? new Date().toISOString() : null,
+      pdf_generated: pdfBase64 !== null,
+      failure_reason: result.ok ? null : (result.error ?? 'unknown'),
+    });
+
+    if (result.ok) recipientsSent.push(to);
+    else recipientsFailed.push(to);
+  }
+
+  // Only a fully-paid settlement advances to invoice_sent — partial payments
+  // still get a statement, but stay partially_paid until the balance clears.
+  if (recipientsSent.length > 0 && settlement.settlement_status === 'paid') {
+    await supabase.from('event_financial_settlements').update({ settlement_status: 'invoice_sent' }).eq('id', settlementId);
+  }
+
+  const { data: orgMembers } = await supabase.from('organization_members').select('user_id').eq('organization_id', organization.id);
+  await Promise.allSettled(
+    (orgMembers ?? []).map((m) =>
+      createNotification({
+        userId: m.user_id as string,
+        organizationId: organization.id,
+        type: 'general',
+        title: `Settlement statement — ${event.title}`,
+        message: `Invoice ${invoiceNumber}: paid ${pdfInput.amountPaid} EGP, remaining ${pdfInput.remainingBalance} EGP.`,
+        relatedEntityType: 'event_financial_settlement',
+        relatedEntityId: settlementId,
+      })
+    )
+  );
+
+  if (recipientsSent.length > 0) {
+    await sendAdminOrgAlert({
+      action: opts.isResend ? 'Settlement statement resent' : 'Settlement statement sent',
+      organizationId: organization.id,
+      organizationName: organization.name,
+      eventId: settlement.event_id as string,
+      eventTitle: event.title,
+      dashboardPath: '/admin/transactions',
+    });
+  }
+  if (recipientsFailed.length > 0) {
+    await sendAdminOrgAlert({
+      action: 'Settlement statement failed to send',
+      organizationId: organization.id,
+      organizationName: organization.name,
+      eventId: settlement.event_id as string,
+      eventTitle: event.title,
+      dashboardPath: '/admin/transactions',
+    });
+  }
+
+  if (pdfInput.remainingBalance > 0 && recipientsSent.length > 0) {
+    await sendAdminOrgAlert({
+      action: 'Organizer has remaining unpaid balance',
+      organizationId: organization.id,
+      organizationName: organization.name,
+      eventId: settlement.event_id as string,
+      eventTitle: event.title,
+      status: `${pdfInput.remainingBalance} EGP remaining`,
+      dashboardPath: '/admin/transactions',
+    });
+  }
+
+  return { ok: recipientsSent.length > 0, invoiceNumber, recipientsSent, recipientsFailed };
 }
