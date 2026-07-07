@@ -410,3 +410,94 @@ export interface Contract {
   created_at: string;
   updated_at: string;
 }
+
+// ─── Round 6: event commission, financial settlements, organizer payouts ──
+
+export type CommissionSource = 'custom_event_commission' | 'organization_override' | 'default_platform_commission';
+export type SettlementStatus =
+  | 'pending_calculation'
+  | 'ready_for_payment'
+  | 'partially_paid'
+  | 'paid'
+  | 'invoice_sent'
+  | 'completed'
+  | 'disputed'
+  | 'cancelled';
+export type InvoiceStatus = 'generated' | 'sent' | 'failed' | 'resent';
+
+export interface EventCommissionSettings {
+  id: string;
+  event_id: string;
+  custom_commission_percentage: number | null;
+  custom_fixed_fee_egp: number | null;
+  is_custom_commission_enabled: boolean;
+  is_locked: boolean;
+  applied_commission_percentage: number;
+  applied_fixed_fee_egp: number;
+  commission_source: CommissionSource;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventFinancialSettlement {
+  id: string;
+  event_id: string;
+  organization_id: string;
+  gross_ticket_revenue: number;
+  refund_amount: number;
+  discount_amount: number;
+  paid_ticket_count: number;
+  free_ticket_count: number;
+  applied_commission_percentage: number;
+  commission_source: CommissionSource;
+  percentage_commission_amount: number;
+  fixed_fee_per_paid_ticket: number;
+  fixed_ticket_fee_amount: number;
+  payment_gateway_fees: number | null;
+  taxes_amount: number | null;
+  total_platform_fees: number;
+  organizer_net_profit: number;
+  amount_paid_to_organizer: number;
+  remaining_amount_due: number;
+  settlement_status: SettlementStatus;
+  internal_notes: string | null;
+  calculated_at: string;
+  paid_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrganizerPayoutRecord {
+  id: string;
+  event_id: string;
+  organization_id: string;
+  settlement_id: string;
+  amount_paid: number;
+  payment_date: string;
+  payment_method: string;
+  payment_reference: string | null;
+  proof_of_payment_url: string | null;
+  internal_notes: string | null;
+  recorded_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SettlementInvoiceLog {
+  id: string;
+  event_id: string;
+  organization_id: string;
+  settlement_id: string;
+  payout_record_id: string | null;
+  invoice_number: string;
+  invoice_status: InvoiceStatus;
+  recipient_email: string;
+  email_sent_at: string | null;
+  pdf_generated: boolean;
+  failure_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
