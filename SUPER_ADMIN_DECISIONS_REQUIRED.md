@@ -56,6 +56,29 @@ they're about what to build/adjust next.
 - **Open**: Beyond registrations, do you want revenue-over-time, conversion-rate (views → registrations), or average-ticket-price charts? The dashboard's "Top events by revenue" list exists but there's no time-series revenue chart yet.
 - **Open**: Is there a KPI you check regularly that isn't represented anywhere yet (e.g. check-in rate on event day, no-show rate, repeat-attendee rate)?
 
+## 8. Commission & Transactions
+
+- ✅ Built (2026-07-07): per-event commission (event custom > organization override > platform default), full
+  gross/fees/net-profit calculation from real payments, a super-admin Transactions page
+  (`/admin/transactions`), manual payout recording with proof-of-payment upload, an auto-generated
+  settlement statement (PDF + email) sent only after a payout is recorded, and an organizer-facing
+  Settlements view (`/organizer/settlements`, own org only).
+- **Open**: What should the platform **default commission %** actually be? Right now `platform_settings.commission_percentage` holds whatever was seeded in Round 5 — confirm the real number before launch.
+- **Open**: Does the **10 EGP fixed fee always apply** to every paid ticket, or should some organizers/events be fee-free? Built: it applies by default from `platform_settings.fixed_fee_egp`, but an admin can disable or override it per event via the "Set commission" dialog.
+- ✅ **Admin can change commission per event**: built — the Event > Organization > Platform hierarchy, with an explicit per-event override and lock toggle at `/admin/transactions`.
+- **Open**: Should commission be computed **before or after refunds**? Built: after — `gross_ticket_revenue` only sums `paid`-status payments; refunded amounts are excluded from the commission base entirely (shown separately as `refund_amount` for transparency).
+- **Open**: Should commission be computed **before or after payment gateway fees**? Not applicable yet — XPay doesn't expose a fee breakdown anywhere in the current integration, so `payment_gateway_fees` stays null/"not available" and commission is computed on the full ticket price. Revisit once (if) gateway-fee data becomes available.
+- **Open**: Should organizer **net profit include or exclude VAT**? Currently excludes — no tax data is tracked (`taxes_amount` stays null/"not available"). Decide if/when Egyptian VAT should be modeled.
+- **Open**: **Document naming** — the brief used "invoice" and "statement" somewhat interchangeably. Built using "Settlement Statement" as the customer-facing name (email subject, PDF filename) while keeping "invoice number" (`MT-INV-{YYYY}-{0001}`) as the built-in reference id. Confirm this naming is right, or if "receipt" should replace either term.
+- ✅ **Partial payments allowed**: built — `partially_paid` status, a running `remaining_amount_due`, and multiple payout records per settlement.
+- **Open**: Should organizers see the **live calculation before any payment is sent**, or only once an admin has recorded the first payout? Currently: a settlement only appears in `/organizer/settlements` once it has at least one paid/refunded payment, but the breakdown itself is visible immediately at that point — before any payout has actually been recorded. Confirm this is the right visibility line, given the constraint that statements themselves must never send early.
+- **Open**: Should organizers be able to **confirm receipt of a payout in-platform**? Not built — they get an in-app notification + email when a statement is sent, but there's no "mark as received" action.
+- ✅ **Unique invoice numbers**: built — a Postgres sequence (`settlement_invoice_seq`) issues `MT-INV-{YYYY}-{0001}`; one per payout, reused (not incremented) on resend.
+- ✅ **PDF downloadable**: built — both the admin and organizer views can regenerate/download the statement PDF at any time.
+- ✅ **Resend capability**: built — admin "Resend statement" action, logged as `resent` in the invoice log.
+- **Open**: Should **setting a custom commission require a reason** (like suspend/archive actions do elsewhere, via `ReasonDialog`)? Not currently enforced — an admin can enable/edit a custom commission with no reason recorded beyond the automatic audit-log diff.
+- **Open**: Should commission **auto-lock once ticket sales begin**, rather than relying on an admin to manually flip the "Lock commission" toggle? Built: a manual `is_locked` field an admin sets themselves; it does not automatically lock at `paid_ticket_count > 0`.
+
 ---
 
 ## Not blocking, but worth flagging while we're here

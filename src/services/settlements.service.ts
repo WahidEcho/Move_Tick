@@ -177,6 +177,19 @@ export async function computeEventFinancials(eventId: string): Promise<ComputedF
   };
 }
 
+async function getEventOrgLabel(eventId: string): Promise<{ organizationId: string; organizationName: string; eventTitle: string } | null> {
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from('events')
+    .select('title, organization:organizations(id, name)')
+    .eq('id', eventId)
+    .single();
+  if (!data) return null;
+  const org = data.organization as unknown as { id: string; name: string } | null;
+  if (!org) return null;
+  return { organizationId: org.id, organizationName: org.name, eventTitle: data.title as string };
+}
+
 function computedFromSettlement(s: EventFinancialSettlement): ComputedFinancials {
   return {
     grossTicketRevenue: Number(s.gross_ticket_revenue),
@@ -316,6 +329,19 @@ export async function recordPayout(
     reason: input.internalNotes ?? null,
   });
 
+  const label = await getEventOrgLabel(input.eventId);
+  if (label) {
+    await sendAdminOrgAlert({
+      action: 'Manual payout recorded',
+      organizationId: label.organizationId,
+      organizationName: label.organizationName,
+      eventId: input.eventId,
+      eventTitle: label.eventTitle,
+      status: `${input.amountPaid} EGP paid, ${newRemaining} EGP remaining`,
+      dashboardPath: '/admin/transactions',
+    });
+  }
+
   return { settlement: updatedSettlement as EventFinancialSettlement, payout: payoutRow as OrganizerPayoutRecord };
 }
 
@@ -390,6 +416,19 @@ export async function setEventCommission(input: SetEventCommissionInput): Promis
     },
   });
 
+  const label = await getEventOrgLabel(input.eventId);
+  if (label) {
+    await sendAdminOrgAlert({
+      action: existing ? 'Custom commission edited' : 'Custom commission added',
+      organizationId: label.organizationId,
+      organizationName: label.organizationName,
+      eventId: input.eventId,
+      eventTitle: label.eventTitle,
+      status: input.isCustomCommissionEnabled ? `${resolved.appliedPercentage}% + ${resolved.fixedFeePerPaidTicket} EGP` : 'disabled',
+      dashboardPath: '/admin/transactions',
+    });
+  }
+
   return refreshed as EventCommissionSettings;
 }
 
@@ -406,7 +445,7 @@ export async function markSettlementDisputed(
   const supabase = createServiceClient();
   const { data: before } = await supabase
     .from('event_financial_settlements')
-    .select('settlement_status, internal_notes')
+    .select('event_id, settlement_status, internal_notes')
     .eq('id', settlementId)
     .single();
 
@@ -427,6 +466,18 @@ export async function markSettlementDisputed(
     newValue: { settlement_status: 'disputed' },
     reason,
   });
+
+  const label = before?.event_id ? await getEventOrgLabel(before.event_id as string) : null;
+  if (label) {
+    await sendAdminOrgAlert({
+      action: 'Settlement marked disputed',
+      organizationId: label.organizationId,
+      organizationName: label.organizationName,
+      eventId: before!.event_id as string,
+      eventTitle: label.eventTitle,
+      dashboardPath: '/admin/transactions',
+    });
+  }
 
   return data as EventFinancialSettlement;
 }
