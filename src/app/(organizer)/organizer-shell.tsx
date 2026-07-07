@@ -6,6 +6,7 @@ import { DashboardHeader } from '@/components/layout/dashboard-header';
 import {
   LayoutDashboard,
   Calendar,
+  Wallet,
   Settings,
 } from 'lucide-react';
 import type { NavItem } from '@/types/ui.types';
@@ -15,6 +16,7 @@ import type { Organization } from '@/types/database.types';
 const organizerNavItems: NavItem[] = [
   { title: 'Overview', href: '/organizer/overview', icon: LayoutDashboard },
   { title: 'Events', href: '/organizer/events', icon: Calendar },
+  { title: 'Settlements', href: '/organizer/settlements', icon: Wallet },
   { title: 'Settings', href: '/organizer/settings', icon: Settings },
 ];
 
