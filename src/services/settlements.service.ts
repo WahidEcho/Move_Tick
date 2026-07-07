@@ -851,3 +851,66 @@ export async function sendSettlementStatement(
 
   return { ok: recipientsSent.length > 0, invoiceNumber, recipientsSent, recipientsFailed };
 }
+
+export interface SettlementPdfBundle {
+  filename: string;
+  base64: string;
+}
+
+/** Regenerates the settlement statement PDF on demand for manual download — read-only, no email/invoice side effects. */
+export async function downloadSettlementStatementPdf(settlementId: string): Promise<SettlementPdfBundle | null> {
+  const supabase = createServiceClient();
+  const { data: settlement } = await supabase
+    .from('event_financial_settlements')
+    .select('*, event:events(title, start_date), organization:organizations(name)')
+    .eq('id', settlementId)
+    .single();
+  if (!settlement) return null;
+
+  const event = settlement.event as { title: string; start_date: string } | null;
+  const organization = settlement.organization as { name: string } | null;
+  if (!event || !organization) return null;
+
+  const [{ data: latestPayout }, { data: latestInvoiceLog }, platformSettings] = await Promise.all([
+    supabase
+      .from('organizer_payout_records')
+      .select('*')
+      .eq('settlement_id', settlementId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('settlement_invoice_logs')
+      .select('invoice_number')
+      .eq('settlement_id', settlementId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    getPlatformSettings(),
+  ]);
+
+  const dateLabel = event.start_date ? format(new Date(event.start_date), 'EEE, MMM d, yyyy') : null;
+
+  const pdfBytes = await generateSettlementPdf({
+    invoiceNumber: latestInvoiceLog?.invoice_number ?? 'DRAFT',
+    organizationName: organization.name,
+    eventTitle: event.title,
+    eventDateLabel: dateLabel,
+    paidTicketCount: settlement.paid_ticket_count,
+    grossTicketRevenue: Number(settlement.gross_ticket_revenue),
+    appliedCommissionPercentage: Number(settlement.applied_commission_percentage),
+    percentageCommissionAmount: Number(settlement.percentage_commission_amount),
+    fixedFeePerPaidTicket: Number(settlement.fixed_fee_per_paid_ticket),
+    fixedTicketFeeAmount: Number(settlement.fixed_ticket_fee_amount),
+    totalPlatformFees: Number(settlement.total_platform_fees),
+    organizerNetProfit: Number(settlement.organizer_net_profit),
+    amountPaid: Number(settlement.amount_paid_to_organizer),
+    remainingBalance: Number(settlement.remaining_amount_due),
+    paymentDateLabel: latestPayout ? format(new Date(latestPayout.payment_date), 'EEE, MMM d, yyyy') : null,
+    paymentMethod: latestPayout?.payment_method ?? null,
+    paymentReference: latestPayout?.payment_reference ?? null,
+    contactEmail: platformSettings.support_email,
+  });
+
+  return { filename: settlementPdfFilename(organization.name, event.title), base64: Buffer.from(pdfBytes).toString('base64') };
+}
