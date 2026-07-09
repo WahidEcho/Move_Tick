@@ -57,7 +57,7 @@ function Button({
   ...props
 }: ButtonProps) {
   const computedClassName = cn(buttonVariants({ variant, size, className }));
-  if (asChild && React.Children.only(props.children)) {
+  if (asChild && React.isValidElement(props.children)) {
     const child = props.children as React.ReactElement<{ className?: string }>;
     return React.cloneElement(child, {
       className: cn(computedClassName, child.props.className),
