@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { DashboardSidebar } from '@/components/layout/dashboard-sidebar';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { SlimFooter } from '@/components/layout/slim-footer';
 import {
   LayoutDashboard,
   Calendar,
@@ -45,6 +46,7 @@ export function OrganizerShell({ profile, org, children }: OrganizerShellProps) 
         <main className="flex-1 p-4 lg:p-6">
           {children}
         </main>
+        <SlimFooter />
       </div>
     </div>
   );

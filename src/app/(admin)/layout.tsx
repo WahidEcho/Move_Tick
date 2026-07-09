@@ -1,6 +1,7 @@
 import { requireAdmin } from '@/lib/auth';
 import { AdminSidebar } from '@/components/layout/admin-sidebar';
 import { DashboardHeader } from '@/components/layout/dashboard-header';
+import { SlimFooter } from '@/components/layout/slim-footer';
 
 export default async function AdminLayout({
   children,
@@ -20,6 +21,7 @@ export default async function AdminLayout({
         <main className="flex-1 p-4 lg:p-6 border-l border-orange-500/10">
           {children}
         </main>
+        <SlimFooter />
       </div>
     </div>
   );

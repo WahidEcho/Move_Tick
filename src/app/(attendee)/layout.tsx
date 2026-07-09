@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth';
 import { PublicHeader } from '@/components/layout/public-header';
+import { PublicFooter } from '@/components/layout/public-footer';
 import { AttendeeNav } from './attendee-nav';
 
 export default async function AttendeeLayout({
@@ -18,6 +19,7 @@ export default async function AttendeeLayout({
           {children}
         </main>
       </div>
+      <PublicFooter />
     </div>
   );
 }
