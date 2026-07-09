@@ -29,6 +29,8 @@ export interface Profile {
   platform_role: UserRole;
   is_disabled: boolean;
   disabled_at: string | null;
+  marketing_opt_out: boolean;
+  unsubscribe_token: string;
   created_at: string;
   updated_at: string;
 }
@@ -500,4 +502,41 @@ export interface SettlementInvoiceLog {
   failure_reason: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// ─── Round 7: marketing announcements ──────────────────────────────────
+export type AnnouncementAudience = 'attendees' | 'organizers' | 'both';
+export type AnnouncementStatus = 'draft' | 'sending' | 'sent' | 'failed';
+export type AnnouncementRecipientStatus = 'pending' | 'sent' | 'failed';
+
+export interface Announcement {
+  id: string;
+  created_by: string;
+  subject: string;
+  headline: string;
+  body: string;
+  cta_label: string | null;
+  cta_url: string | null;
+  audience: AnnouncementAudience;
+  send_in_app: boolean;
+  status: AnnouncementStatus;
+  total_recipients: number;
+  sent_count: number;
+  failed_count: number;
+  test_sent_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AnnouncementRecipient {
+  id: string;
+  announcement_id: string;
+  user_id: string | null;
+  email: string;
+  status: AnnouncementRecipientStatus;
+  error: string | null;
+  sent_at: string | null;
+  created_at: string;
 }

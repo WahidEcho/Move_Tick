@@ -69,3 +69,51 @@ export function dataUrlToBase64(dataUrl: string): string {
   const comma = dataUrl.indexOf(',');
   return comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
 }
+
+export interface BatchEmailItem {
+  to: string;
+  subject: string;
+  html: string;
+  /** Extra headers, e.g. List-Unsubscribe for bulk/marketing sends. */
+  headers?: Record<string, string>;
+}
+
+export interface BatchEmailResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Sends up to 100 emails in a single Resend batch API call (no attachments —
+ * not needed for announcements). Used instead of looping sendEmail() so a
+ * multi-thousand-recipient blast doesn't get throttled by the per-second
+ * rate limit that applies to individual send calls.
+ */
+export async function sendBatchEmails(items: BatchEmailItem[]): Promise<BatchEmailResult> {
+  if (items.length === 0) return { ok: true };
+  if (!resend) {
+    console.warn(`[email] RESEND_API_KEY not set — skipping batch of ${items.length} emails`);
+    return { ok: false, error: 'email_not_configured' };
+  }
+
+  try {
+    const { error } = await resend.batch.send(
+      items.map((item) => ({
+        from: defaultFrom,
+        to: item.to,
+        subject: item.subject,
+        html: item.html,
+        headers: item.headers,
+      }))
+    );
+    if (error) {
+      console.error(`[email] batch send failed for ${items.length} emails:`, error.message);
+      return { ok: false, error: error.message };
+    }
+    return { ok: true };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'unknown email error';
+    console.error(`[email] batch send threw for ${items.length} emails:`, msg);
+    return { ok: false, error: msg };
+  }
+}

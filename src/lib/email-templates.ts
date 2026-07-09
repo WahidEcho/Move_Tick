@@ -455,3 +455,32 @@ export function ticketIssuedEmail(data: TicketEmailData): RenderedEmail {
     html: shell(inner),
   };
 }
+
+export interface AnnouncementEmailData {
+  headline: string;
+  /** Plain text — newlines become paragraph breaks. */
+  body: string;
+  ctaLabel?: string | null;
+  ctaUrl?: string | null;
+  /** Replaced by the announcements service with the recipient's actual unsubscribe URL. */
+  unsubscribeUrl: string;
+}
+
+/** Marketing/announcement email: headline + body + optional CTA + unsubscribe footer link. */
+export function announcementEmail(data: AnnouncementEmailData): RenderedEmail {
+  const paragraphs = data.body
+    .split(/\n{2,}/)
+    .map((p) => `<p style="margin:0 0 16px 0;color:#374151;font-size:15px;line-height:1.6;">${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`)
+    .join('');
+  const inner = `
+    <tr><td style="padding:32px 32px 8px 32px;">
+      <p style="margin:0 0 4px 0;color:${BRAND_PURPLE};font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Move-Tick news</p>
+      <h1 style="margin:0 0 16px 0;color:${NEAR_BLACK};font-size:24px;line-height:1.25;">${escapeHtml(data.headline)}</h1>
+      ${paragraphs}
+      ${data.ctaUrl && data.ctaLabel ? `<div style="text-align:center;margin:8px 0 8px 0;">${button(data.ctaUrl, data.ctaLabel)}</div>` : ''}
+      <p style="margin:24px 0 0 0;color:#9ca3af;font-size:12px;line-height:1.5;">
+        <a href="${data.unsubscribeUrl}" style="color:#9ca3af;text-decoration:underline;">Unsubscribe from Move-Tick announcements</a>
+      </p>
+    </td></tr>`;
+  return { subject: data.headline, html: shell(inner) };
+}

@@ -21,6 +21,7 @@ import {
   ShieldAlert,
   Mail,
   Wallet,
+  Megaphone,
 } from 'lucide-react';
 
 const adminNavItems = [
@@ -33,6 +34,7 @@ const adminNavItems = [
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/admin/audit', label: 'Audit Log', icon: ShieldAlert },
   { href: '/admin/emails', label: 'Email Log', icon: Mail },
+  { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
