@@ -40,6 +40,9 @@ export async function updateEventAction(
       visibility: data.visibility,
       // capacity intentionally omitted — derived from ticket types
       // (recomputeEventCapacity in tickets.service).
+      doors_open_time: data.doors_open_time || null,
+      maps_url: data.maps_url || null,
+      facilities: data.facilities ?? [],
     });
     revalidatePath(`/organizer/events/${eventId}`);
     revalidatePath(`/organizer/events/${eventId}/edit`);

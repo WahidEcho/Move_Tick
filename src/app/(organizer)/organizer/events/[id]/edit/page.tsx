@@ -13,6 +13,7 @@ import {
   type EventSettingsInput,
 } from '@/lib/validations';
 import { EVENT_CATEGORIES } from '@/lib/constants';
+import { FACILITIES } from '@/lib/facilities';
 import { generateSlug } from '@/lib/helpers';
 import { FormField } from '@/components/forms/form-field';
 import { FormSelect } from '@/components/forms/form-select';
@@ -69,6 +70,9 @@ export default function EditEventPage() {
       category: '',
       visibility: 'public',
       capacity: null,
+      doors_open_time: '',
+      maps_url: '',
+      facilities: [],
     },
   });
 
@@ -124,6 +128,9 @@ export default function EditEventPage() {
         category: ev.category ?? '',
         visibility: ev.visibility ?? 'public',
         capacity: ev.capacity ?? null,
+        doors_open_time: ev.doors_open_time ? toDatetimeLocal(ev.doors_open_time) : '',
+        maps_url: ev.maps_url ?? '',
+        facilities: ev.facilities ?? [],
       });
       settingsForm.reset({
         approval_required: settings.approval_required ?? false,
@@ -298,6 +305,50 @@ export default function EditEventPage() {
                   <FormField label="Country" name="country" error={eventForm.formState.errors.country?.message}>
                     <Input {...eventForm.register('country')} placeholder="Country" />
                   </FormField>
+                </div>
+                <FormField
+                  label="Google Maps link"
+                  name="maps_url"
+                  error={eventForm.formState.errors.maps_url?.message}
+                  description="Shown as an “Open in Maps” button on your event page."
+                >
+                  <Input {...eventForm.register('maps_url')} placeholder="https://maps.google.com/..." />
+                </FormField>
+                <FormField label="Doors open" name="doors_open_time" error={eventForm.formState.errors.doors_open_time?.message}>
+                  <Input type="datetime-local" {...eventForm.register('doors_open_time')} />
+                </FormField>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Venue facilities</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {FACILITIES.map((f) => {
+                    const Icon = f.icon;
+                    const selected = (eventForm.watch('facilities') ?? []).includes(f.value);
+                    return (
+                      <button
+                        key={f.value}
+                        type="button"
+                        onClick={() => {
+                          const current = eventForm.watch('facilities') ?? [];
+                          eventForm.setValue(
+                            'facilities',
+                            selected ? current.filter((v) => v !== f.value) : [...current, f.value]
+                          );
+                        }}
+                        className={`flex items-center gap-2 rounded-lg border p-2.5 text-sm transition-colors ${
+                          selected ? 'border-primary bg-primary/5 text-foreground' : 'border-border text-muted-foreground hover:bg-muted/50'
+                        }`}
+                      >
+                        <Icon className="size-4 shrink-0" />
+                        {f.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>

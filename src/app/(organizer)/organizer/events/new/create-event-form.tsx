@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { eventSchema, type EventInput } from '@/lib/validations';
 import { EVENT_CATEGORIES } from '@/lib/constants';
+import { FACILITIES } from '@/lib/facilities';
 import { generateSlug } from '@/lib/helpers';
 import { FormField } from '@/components/forms/form-field';
 import { FormSelect } from '@/components/forms/form-select';
@@ -53,6 +54,9 @@ export function CreateEventForm({ orgId }: { orgId: string }) {
       category: '',
       visibility: 'public',
       capacity: null,
+      doors_open_time: '',
+      maps_url: '',
+      facilities: [],
     },
   });
 
@@ -193,6 +197,52 @@ export function CreateEventForm({ orgId }: { orgId: string }) {
               <FormField label="Country" name="country" error={errors.country?.message}>
                 <Input {...register('country')} placeholder="Country" />
               </FormField>
+            </div>
+
+            <FormField
+              label="Google Maps link"
+              name="maps_url"
+              error={errors.maps_url?.message}
+              description="Shown as an “Open in Maps” button on your event page."
+            >
+              <Input {...register('maps_url')} placeholder="https://maps.google.com/..." />
+            </FormField>
+
+            <FormField label="Doors open" name="doors_open_time" error={errors.doors_open_time?.message}>
+              <Input type="datetime-local" {...register('doors_open_time')} />
+            </FormField>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Venue facilities</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {FACILITIES.map((f) => {
+                const Icon = f.icon;
+                const selected = (watch('facilities') ?? []).includes(f.value);
+                return (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onClick={() => {
+                      const current = watch('facilities') ?? [];
+                      setValue(
+                        'facilities',
+                        selected ? current.filter((v) => v !== f.value) : [...current, f.value]
+                      );
+                    }}
+                    className={`flex items-center gap-2 rounded-lg border p-2.5 text-sm transition-colors ${
+                      selected ? 'border-primary bg-primary/5 text-foreground' : 'border-border text-muted-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <Icon className="size-4 shrink-0" />
+                    {f.label}
+                  </button>
+                );
+              })}
             </div>
           </CardContent>
         </Card>

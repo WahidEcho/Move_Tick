@@ -45,6 +45,9 @@ export async function createEventAction(
       // capacity is derived from ticket types once they're added
       // (recomputeEventCapacity in tickets.service).
       capacity: null,
+      doors_open_time: data.doors_open_time || null,
+      maps_url: data.maps_url || null,
+      facilities: data.facilities ?? [],
     });
     revalidatePath('/organizer/overview');
     revalidatePath('/organizer/events');

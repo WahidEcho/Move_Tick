@@ -16,11 +16,17 @@ import {
   Ticket,
   Shield,
   ArrowRight,
+  ExternalLink,
+  CalendarPlus,
+  DoorOpen,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { RegisterDialog } from './register-dialog';
 import { isOptimizableImage } from '../event-card';
 import { formatEgp } from '@/lib/helpers';
+import { linkify } from '@/lib/linkify';
+import { resolveMapsUrl, googleCalendarUrl } from '@/lib/event-links';
+import { FACILITIES } from '@/lib/facilities';
 
 interface EventPageProps {
   params: Promise<{ slug: string }>;
@@ -76,21 +82,36 @@ export default async function EventPage({ params }: EventPageProps) {
   const enableWaitlist = settings?.enable_waitlist ?? false;
 
   const publicTicketTypes = ticketTypes.filter((tt) => tt.visibility === 'public');
+  const mapsUrl = resolveMapsUrl(event);
+  const calendarUrl = googleCalendarUrl(event);
+  const eventFacilities = FACILITIES.filter((f) => event.facilities?.includes(f.value));
+  const hasVenueCard = Boolean(event.venue || event.location || event.doors_open_time || eventFacilities.length > 0);
 
   return (
     <div className="min-h-screen">
-      {/* Cover */}
-      <div className="relative h-64 w-full overflow-hidden bg-gradient-to-br from-primary/30 via-primary/20 to-muted sm:h-80">
+      {/* Cover — full image always visible (object-contain), blurred copy fills the backdrop */}
+      <div className="relative h-64 w-full overflow-hidden bg-gradient-to-br from-primary/30 via-primary/20 to-muted sm:h-96">
         {event.cover_image_url ? (
-          <Image
-            src={event.cover_image_url}
-            alt={event.title}
-            fill
-            priority
-            sizes="100vw"
-            unoptimized={!isOptimizableImage(event.cover_image_url)}
-            className="object-cover"
-          />
+          <>
+            <Image
+              src={event.cover_image_url}
+              alt=""
+              aria-hidden
+              fill
+              sizes="100vw"
+              unoptimized={!isOptimizableImage(event.cover_image_url)}
+              className="scale-110 object-cover opacity-60 blur-2xl"
+            />
+            <Image
+              src={event.cover_image_url}
+              alt={event.title}
+              fill
+              priority
+              sizes="100vw"
+              unoptimized={!isOptimizableImage(event.cover_image_url)}
+              className="object-contain"
+            />
+          </>
         ) : null}
         <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
       </div>
@@ -119,7 +140,18 @@ export default async function EventPage({ params }: EventPageProps) {
                   href={`/organizations/${event.organization.slug}`}
                   className="mt-2 flex items-center gap-2 text-muted-foreground hover:text-foreground"
                 >
-                  <Building2 className="size-4" />
+                  {event.organization.logo_url ? (
+                    <Image
+                      src={event.organization.logo_url}
+                      alt={event.organization.name}
+                      width={20}
+                      height={20}
+                      unoptimized={!isOptimizableImage(event.organization.logo_url)}
+                      className="size-5 shrink-0 rounded-full object-cover"
+                    />
+                  ) : (
+                    <Building2 className="size-4" />
+                  )}
                   {event.organization.name}
                 </Link>
               )}
@@ -156,6 +188,25 @@ export default async function EventPage({ params }: EventPageProps) {
               )}
             </div>
 
+            {/* Maps + calendar quick actions */}
+            <div className="flex flex-wrap gap-2">
+              {mapsUrl && (
+                <Button variant="outline" size="sm" asChild className="gap-1.5">
+                  <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+                    <MapPin className="size-3.5" />
+                    Open in Maps
+                    <ExternalLink className="size-3" />
+                  </a>
+                </Button>
+              )}
+              <Button variant="outline" size="sm" asChild className="gap-1.5">
+                <a href={calendarUrl} target="_blank" rel="noopener noreferrer">
+                  <CalendarPlus className="size-3.5" />
+                  Add to Calendar
+                </a>
+              </Button>
+            </div>
+
             {/* Invite only / approval messaging */}
             {isInviteOnly && (
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
@@ -182,11 +233,69 @@ export default async function EventPage({ params }: EventPageProps) {
                 <div className="whitespace-pre-wrap text-muted-foreground">
                   {event.description.split('\n').map((p, i) => (
                     <p key={i} className="mb-2 last:mb-0">
-                      {p}
+                      {linkify(p)}
                     </p>
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* Venue details */}
+            {hasVenueCard && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Venue</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {(event.venue || event.location) && (
+                    <div className="flex items-start gap-2">
+                      <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                      <div>
+                        {event.venue && <p className="font-medium text-foreground">{event.venue}</p>}
+                        <p className="text-sm text-muted-foreground">
+                          {[event.location, event.city, event.country].filter(Boolean).join(', ')}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {event.doors_open_time && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <DoorOpen className="size-4 shrink-0" />
+                      Gates open {format(new Date(event.doors_open_time), 'h:mm a')}
+                    </div>
+                  )}
+                  {eventFacilities.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Facilities
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {eventFacilities.map((f) => {
+                          const Icon = f.icon;
+                          return (
+                            <span
+                              key={f.value}
+                              className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground"
+                            >
+                              <Icon className="size-3.5" />
+                              {f.label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {mapsUrl && (
+                    <Button variant="outline" size="sm" asChild className="gap-1.5">
+                      <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+                        <MapPin className="size-3.5" />
+                        Open in Maps
+                        <ExternalLink className="size-3" />
+                      </a>
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
             )}
 
             {/* Social proof */}

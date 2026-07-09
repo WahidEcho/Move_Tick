@@ -9,7 +9,7 @@ import type { PaginatedResult } from '@/types/domain.types';
 
 export type EventWithDetails = Event & {
   event_settings: EventSettings | null;
-  organization?: { id: string; name: string; slug: string } | null;
+  organization?: { id: string; name: string; slug: string; logo_url: string | null } | null;
 };
 
 export interface CreateEventData {
@@ -26,6 +26,9 @@ export interface CreateEventData {
   category?: string | null;
   visibility?: EventVisibility;
   capacity?: number | null;
+  doors_open_time?: string | null;
+  maps_url?: string | null;
+  facilities?: string[];
 }
 
 export interface UpdateEventData {
@@ -44,6 +47,9 @@ export interface UpdateEventData {
   category?: string | null;
   visibility?: EventVisibility;
   capacity?: number | null;
+  doors_open_time?: string | null;
+  maps_url?: string | null;
+  facilities?: string[];
 }
 
 export interface UpdateEventSettingsData {
@@ -131,6 +137,9 @@ export async function createEvent(
       category: data.category ?? null,
       visibility: data.visibility ?? 'public',
       capacity: data.capacity ?? null,
+      doors_open_time: data.doors_open_time ?? null,
+      maps_url: data.maps_url ?? null,
+      facilities: data.facilities ?? [],
       is_published: false,
       is_cancelled: false,
     })
@@ -181,7 +190,7 @@ export async function getEventBySlug(
     .select(`
       *,
       event_settings:event_settings(*),
-      organization:organizations(id, name, slug)
+      organization:organizations(id, name, slug, logo_url)
     `)
     .eq('slug', slug)
     .maybeSingle();

@@ -123,6 +123,9 @@ export interface Event {
   is_cancelled: boolean;
   is_hidden: boolean;
   archived_at: string | null;
+  doors_open_time: string | null;
+  maps_url: string | null;
+  facilities: string[];
   created_at: string;
   updated_at: string;
   organization?: Organization;

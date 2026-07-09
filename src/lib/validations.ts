@@ -68,6 +68,9 @@ export const eventSchema = z.object({
   category: z.string().min(1, 'Category is required'),
   visibility: z.enum(['public', 'private', 'invite_only', 'members_only']),
   capacity: z.number().min(1).optional().nullable(),
+  doors_open_time: z.string().optional(),
+  maps_url: z.string().url().optional().or(z.literal('')),
+  facilities: z.array(z.string()).optional(),
 });
 
 export const eventSettingsSchema = z.object({
