@@ -46,6 +46,8 @@ export async function generateApplePass(ticket: WalletTicketData): Promise<Buffe
       organizationName: cfg.organizationName,
       description: `${ticket.eventTitle} ticket`,
       serialNumber: ticket.ticketId,
+      // Header reads [MB mark logo] MoveTick — matches the ticket design.
+      logoText: 'MoveTick',
       foregroundColor: WHITE,
       labelColor: WHITE,
       backgroundColor: BRAND_PURPLE,
