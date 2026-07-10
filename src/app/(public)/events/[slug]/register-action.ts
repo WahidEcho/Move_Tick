@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase-server';
 import * as ticketsService from '@/services/tickets.service';
 import * as eventsService from '@/services/events.service';
 import { sendTicketEmail } from '@/services/email.service';
+import { createNotification } from '@/services/notifications.service';
 
 export type RegisterResult =
   | { success: true; registration: { id: string; status: string }; ticket?: { id: string }; message: string }
@@ -164,6 +165,15 @@ export async function registerForEvent(
     if (!emailResult.ok) {
       console.warn(`[register] ticket email not sent for ${ticket.id}: ${emailResult.error}`);
     }
+
+    await createNotification({
+      userId,
+      type: 'ticket_issued',
+      title: 'Your ticket is ready',
+      message: `Your ticket for ${event.title} is confirmed. Tap to view your QR code.`,
+      relatedEntityType: 'ticket',
+      relatedEntityId: ticket.id,
+    });
 
     return {
       success: true,

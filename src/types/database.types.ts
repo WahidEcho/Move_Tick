@@ -16,7 +16,8 @@ export type OrganizationStatus = 'active' | 'pending' | 'suspended' | 'on_hold' 
 export type NotificationType =
   | 'org_approved' | 'org_rejected' | 'org_more_info_requested'
   | 'org_suspended' | 'org_on_hold' | 'org_reactivated'
-  | 'org_limit_reached' | 'event_hidden' | 'event_published' | 'staff_assigned' | 'general';
+  | 'org_limit_reached' | 'event_hidden' | 'event_published' | 'staff_assigned' | 'general'
+  | 'ticket_issued';
 export type ContractStatus =
   | 'draft' | 'generated' | 'sent' | 'viewed' | 'signed' | 'completed' | 'declined' | 'expired' | 'failed';
 

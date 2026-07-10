@@ -4,6 +4,7 @@ import { validateCoupon } from './coupons.service';
 import * as ticketsService from './tickets.service';
 import { sendTicketEmail } from './email.service';
 import { getAppUrl as appUrl } from '@/lib/app-url';
+import { createNotification } from './notifications.service';
 
 export interface CreateCheckoutInput {
   eventId: string;
@@ -174,6 +175,20 @@ export async function fulfillCheckoutCompleted(session: {
     );
 
     await supabase.from('payments').update({ tickets_issued: qty }).eq('id', claimed.id);
+
+    const { data: eventRow } = await supabase
+      .from('events')
+      .select('title')
+      .eq('id', claimed.event_id as string)
+      .maybeSingle();
+    await createNotification({
+      userId: claimed.user_id as string,
+      type: 'ticket_issued',
+      title: 'Your ticket is ready',
+      message: `Your payment was confirmed and your ticket${qty > 1 ? 's are' : ' is'} ready for ${eventRow?.title ?? 'your event'}.`,
+      relatedEntityType: 'ticket',
+      relatedEntityId: ticketIds[0],
+    });
 
     if (claimed.coupon_id) {
       await supabase.rpc('increment_coupon_redemption', { p_coupon_id: claimed.coupon_id });
