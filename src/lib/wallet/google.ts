@@ -3,7 +3,9 @@ import { getGoogleConfig } from './config';
 import type { WalletTicketData } from './types';
 import { getAppUrl as appUrl } from '@/lib/app-url';
 
-const BRAND_PURPLE_HEX = '#5B3BE8';
+// Matches the in-app/web ticket card's dark indigo (Google Wallet only takes
+// one flat color, so we use the gradient's midpoint).
+const TICKET_INDIGO_HEX = '#251A66';
 
 /**
  * Build an "Add to Google Wallet" save URL for a ticket, or null if Google
@@ -26,7 +28,7 @@ export function getGoogleWalletSaveUrl(ticket: WalletTicketData): string | null 
     issuerName: 'Move Beyond',
     reviewStatus: 'UNDER_REVIEW',
     eventName: { defaultValue: { language: 'en-US', value: ticket.eventTitle } },
-    hexBackgroundColor: BRAND_PURPLE_HEX,
+    hexBackgroundColor: TICKET_INDIGO_HEX,
   };
 
   const location = [ticket.venue, ticket.city].filter(Boolean).join(', ');

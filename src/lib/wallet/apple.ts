@@ -10,7 +10,11 @@ function asset(name: string): Buffer {
   return readFileSync(join(ASSETS_DIR, name));
 }
 
-const BRAND_PURPLE = 'rgb(91, 59, 232)';
+// Mirrors the in-app/web ticket card: dark indigo gradient background
+// (#120E28 -> #251A66 -> #4C33D6, shipped as background*.png), #A99BFF
+// uppercase labels, white values.
+const TICKET_INDIGO = 'rgb(18, 14, 40)';
+const LABEL_PURPLE = 'rgb(169, 155, 255)';
 const WHITE = 'rgb(255, 255, 255)';
 
 /**
@@ -33,6 +37,9 @@ export async function generateApplePass(ticket: WalletTicketData): Promise<Buffe
       'icon@2x.png': asset('icon@2x.png'),
       'logo.png': asset('logo.png'),
       'logo@2x.png': asset('logo@2x.png'),
+      'background.png': asset('background.png'),
+      'background@2x.png': asset('background@2x.png'),
+      'background@3x.png': asset('background@3x.png'),
     },
     {
       wwdr: cfg.wwdrCert,
@@ -49,8 +56,8 @@ export async function generateApplePass(ticket: WalletTicketData): Promise<Buffe
       // Header reads [MB mark logo] MoveTick — matches the ticket design.
       logoText: 'MoveTick',
       foregroundColor: WHITE,
-      labelColor: WHITE,
-      backgroundColor: BRAND_PURPLE,
+      labelColor: LABEL_PURPLE,
+      backgroundColor: TICKET_INDIGO,
     }
   );
 
