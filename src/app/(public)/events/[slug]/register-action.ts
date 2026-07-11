@@ -53,9 +53,43 @@ export async function registerForEvent(
     };
   }
 
-  // Check ticket type availability
+  // Check ticket type availability. A sold-out FREE type joins the waitlist
+  // (when the event has one) instead of dead-ending — same standing as the
+  // event-capacity waitlist below.
   const available = await ticketsService.getTicketTypeAvailability(ticketTypeId);
   if (available <= 0) {
+    if (enableWaitlist) {
+      const { data: existing } = await supabase
+        .from('registrations')
+        .select('id, status')
+        .eq('event_id', eventId)
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (existing && ['confirmed', 'approved', 'pending', 'waitlisted'].includes(existing.status as string)) {
+        return { success: false, message: 'You already have a registration for this event' };
+      }
+      const { data: registration, error } = await supabase
+        .from('registrations')
+        .insert({
+          event_id: eventId,
+          user_id: userId,
+          ticket_type_id: ticketTypeId,
+          status: 'waitlisted',
+          ticket_id: null,
+          source: 'direct',
+          notes: null,
+        })
+        .select('id, status')
+        .single();
+      if (error) {
+        return { success: false, message: error.message };
+      }
+      return {
+        success: true,
+        registration: registration as { id: string; status: string },
+        message: "This ticket is sold out — you've been added to the waitlist.",
+      };
+    }
     return { success: false, message: 'This ticket type is sold out' };
   }
 
