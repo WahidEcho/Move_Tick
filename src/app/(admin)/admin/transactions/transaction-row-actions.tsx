@@ -81,13 +81,18 @@ export function TransactionRowActions({ row }: { row: SettlementListRow }) {
   const [proofUrls, setProofUrls] = useState<Record<string, string | null>>({});
 
   const settlement = row.settlement;
+  // Commission auto-locks the moment the first paid sale lands.
+  const commissionAutoLocked = row.computed.paidTicketCount > 0;
 
   const [commissionForm, setCommissionForm] = useState({
     isCustomCommissionEnabled: false,
     customCommissionPercentage: '' as string,
     customFixedFeeEgp: '' as string,
     isLocked: false,
+    reasonPreset: '',
+    reasonText: '',
   });
+  const [commissionError, setCommissionError] = useState<string | null>(null);
 
   const [paymentForm, setPaymentForm] = useState({
     amountPaid: String(settlement?.remaining_amount_due ?? row.computed.organizerNetProfit),
@@ -103,10 +108,16 @@ export function TransactionRowActions({ row }: { row: SettlementListRow }) {
 
   const refresh = () => startTransition(() => router.refresh());
 
+  const commissionReason =
+    commissionForm.reasonPreset === 'other'
+      ? commissionForm.reasonText.trim()
+      : commissionForm.reasonPreset;
+
   const handleSaveCommission = async () => {
     setSaving(true);
+    setCommissionError(null);
     try {
-      await setCommissionAction({
+      const result = await setCommissionAction({
         eventId: row.event.id,
         isCustomCommissionEnabled: commissionForm.isCustomCommissionEnabled,
         customCommissionPercentage: commissionForm.customCommissionPercentage
@@ -114,7 +125,12 @@ export function TransactionRowActions({ row }: { row: SettlementListRow }) {
           : null,
         customFixedFeeEgp: commissionForm.customFixedFeeEgp ? Number(commissionForm.customFixedFeeEgp) : null,
         isLocked: commissionForm.isLocked,
+        reason: commissionReason,
       });
+      if (!result.success) {
+        setCommissionError(('message' in result && result.message) || 'Failed to save commission');
+        return;
+      }
       setCommissionOpen(false);
       refresh();
     } finally {
@@ -275,7 +291,7 @@ export function TransactionRowActions({ row }: { row: SettlementListRow }) {
               label={`Fixed fee (${money(row.computed.fixedFeePerPaidTicket)} × ${row.computed.paidTicketCount})`}
               value={`${money(row.computed.fixedTicketFeeAmount)} EGP`}
             />
-            <Row label="Payment gateway fees" value={row.computed.paymentGatewayFees != null ? `${money(row.computed.paymentGatewayFees)} EGP` : 'Not available'} />
+            <Row label="XPay gateway fees (est., platform-absorbed)" value={row.computed.paymentGatewayFees != null ? `${money(row.computed.paymentGatewayFees)} EGP` : 'Not available'} />
             <Row label="Taxes" value={row.computed.taxesAmount != null ? `${money(row.computed.taxesAmount)} EGP` : 'Not available'} />
             <Row label="Total platform fees" value={`${money(row.computed.totalPlatformFees)} EGP`} bold />
             <div className="my-2 border-t border-border" />
@@ -308,6 +324,15 @@ export function TransactionRowActions({ row }: { row: SettlementListRow }) {
               ({row.computed.commissionSource.replace(/_/g, ' ')}).
             </DialogDescription>
           </DialogHeader>
+          {commissionAutoLocked ? (
+            <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
+              <p className="font-medium">Commission is locked</p>
+              <p className="mt-1 text-muted-foreground">
+                This event has taken paid sales, so its commission terms froze automatically — the rate buyers
+                purchased under can&rsquo;t be changed retroactively.
+              </p>
+            </div>
+          ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between rounded-lg border border-border p-3">
               <p className="text-sm font-medium">Enable custom commission for this event</p>
@@ -343,22 +368,63 @@ export function TransactionRowActions({ row }: { row: SettlementListRow }) {
                 />
               </div>
             </div>
+            <div className="space-y-1.5">
+              <Label>Reason for this change (required)</Label>
+              <select
+                className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={commissionForm.reasonPreset}
+                onChange={(e) => setCommissionForm((f) => ({ ...f, reasonPreset: e.target.value }))}
+              >
+                <option value="">Select a reason…</option>
+                <option value="Contract amendment agreed with the organizer (mutual consent — Egyptian Civil Code art. 147)">
+                  Contract amendment agreed with organizer
+                </option>
+                <option value="Promotional / launch rate agreed in writing with the organizer">
+                  Promotional / launch rate (agreed in writing)
+                </option>
+                <option value="Volume-based rate per the signed organizer agreement">
+                  Volume-based rate per signed agreement
+                </option>
+                <option value="Reduced rate for charity / non-profit event">Charity / non-profit event rate</option>
+                <option value="Correction of a data-entry error in the original commission setup">
+                  Correction of data-entry error
+                </option>
+                <option value="other">Other (describe below)</option>
+              </select>
+              {commissionForm.reasonPreset === 'other' && (
+                <Textarea
+                  rows={2}
+                  placeholder="Describe the reason — stored permanently in the audit log"
+                  value={commissionForm.reasonText}
+                  onChange={(e) => setCommissionForm((f) => ({ ...f, reasonText: e.target.value }))}
+                />
+              )}
+              <p className="text-xs text-muted-foreground">
+                Stored permanently in the audit log as evidence of the agreed contract variation.
+              </p>
+            </div>
             <div className="flex items-center justify-between rounded-lg border border-border p-3">
               <div>
-                <p className="text-sm font-medium">Lock commission</p>
-                <p className="text-xs text-muted-foreground">Prevents any further changes once sales have begun.</p>
+                <p className="text-sm font-medium">Lock commission now</p>
+                <p className="text-xs text-muted-foreground">
+                  Locks immediately. Otherwise it locks automatically at the first paid sale.
+                </p>
               </div>
               <Switch checked={commissionForm.isLocked} onCheckedChange={(v) => setCommissionForm((f) => ({ ...f, isLocked: v }))} />
             </div>
+            {commissionError && <p className="text-sm text-destructive">{commissionError}</p>}
           </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setCommissionOpen(false)} disabled={saving}>
-              Cancel
+              {commissionAutoLocked ? 'Close' : 'Cancel'}
             </Button>
-            <Button onClick={handleSaveCommission} disabled={saving}>
-              {saving && <Loader2 className="size-4 animate-spin" />}
-              Save commission
-            </Button>
+            {!commissionAutoLocked && (
+              <Button onClick={handleSaveCommission} disabled={saving || !commissionReason}>
+                {saving && <Loader2 className="size-4 animate-spin" />}
+                Save commission
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -26,11 +26,16 @@ export interface SetCommissionInput {
   customCommissionPercentage: number | null;
   customFixedFeeEgp: number | null;
   isLocked: boolean;
+  reason: string;
 }
 
 export async function setCommissionAction(input: SetCommissionInput) {
   const profile = await requireAdmin();
-  await setEventCommission({ ...input, actorId: profile.id });
+  try {
+    await setEventCommission({ ...input, actorId: profile.id });
+  } catch (e) {
+    return { success: false, message: e instanceof Error ? e.message : 'Failed to set commission' };
+  }
   revalidatePath('/admin/transactions');
   return { success: true };
 }

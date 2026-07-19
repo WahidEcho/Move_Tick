@@ -262,7 +262,7 @@ export function OrgRowActions({ org }: { org: OrganizationWithCounts }) {
             <DialogTitle>{org.name} — revenue &amp; history</DialogTitle>
             <DialogDescription>
               Commission {org.commission_percentage ?? 0}% + {org.fixed_fee_egp ?? 0} EGP fixed fee per paid ticket
-              (scaffolded — not yet applied at checkout).
+              (deducted from the organizer&rsquo;s payout at settlement).
             </DialogDescription>
           </DialogHeader>
           {statsLoading || !stats ? (

@@ -108,12 +108,15 @@ export interface ComputedFinancials {
 
 /**
  * Live aggregation of an event's financials from `payments` + `tickets`.
- * Gateway fees and taxes aren't tracked anywhere in the payment infrastructure,
- * so those two lines stay null ("not available") rather than being guessed.
+ * Gateway fees are ESTIMATED from the platform's XPay fee model
+ * (xpay_fee_percentage + xpay_fee_fixed_egp per paid transaction) — XPay does
+ * not expose a per-transaction fee via API, so this mirrors their published
+ * deduction for bank reconciliation. Taxes stay null (no VAT model yet).
  */
 export async function computeEventFinancials(eventId: string): Promise<ComputedFinancials> {
   const supabase = createServiceClient();
   const commission = await resolveEventCommission(eventId);
+  const platformSettings = await getPlatformSettings();
 
   const { data: payments } = await supabase
     .from('payments')
@@ -133,6 +136,7 @@ export async function computeEventFinancials(eventId: string): Promise<ComputedF
   let refundMinor = 0;
   let discountMinor = 0;
   let paidTicketCount = 0;
+  let paidTransactionCount = 0;
 
   for (const p of rows) {
     const amountTotal = Number(p.amount_total ?? 0);
@@ -143,6 +147,7 @@ export async function computeEventFinancials(eventId: string): Promise<ComputedF
     }
     paidMinor += amountTotal;
     paidTicketCount += quantity;
+    paidTransactionCount += 1;
     const listMinor = Math.round((priceByType.get(p.ticket_type_id as string) ?? 0) * 100) * quantity;
     const diff = listMinor - amountTotal;
     if (diff > 0) discountMinor += diff;
@@ -159,6 +164,16 @@ export async function computeEventFinancials(eventId: string): Promise<ComputedF
   const fixedTicketFeeAmount = round2(paidTicketCount * commission.fixedFeePerPaidTicket);
   const totalPlatformFees = round2(percentageCommissionAmount + fixedTicketFeeAmount);
 
+  // XPay's deduction is absorbed by the platform (never the organizer):
+  // commission stays computed on the full ticket price, and the organizer's
+  // net profit is unchanged by this estimate.
+  const xpayPct = Number(platformSettings.xpay_fee_percentage ?? 0);
+  const xpayFixed = Number(platformSettings.xpay_fee_fixed_egp ?? 0);
+  const paymentGatewayFees =
+    paidTransactionCount > 0
+      ? round2(grossTicketRevenue * (xpayPct / 100) + paidTransactionCount * xpayFixed)
+      : 0;
+
   return {
     grossTicketRevenue,
     refundAmount: round2(refundMinor / 100),
@@ -170,7 +185,7 @@ export async function computeEventFinancials(eventId: string): Promise<ComputedF
     percentageCommissionAmount,
     fixedFeePerPaidTicket: commission.fixedFeePerPaidTicket,
     fixedTicketFeeAmount,
-    paymentGatewayFees: null,
+    paymentGatewayFees,
     taxesAmount: null,
     totalPlatformFees,
     organizerNetProfit: round2(grossTicketRevenue - totalPlatformFees),
@@ -251,6 +266,7 @@ export async function upsertSettlement(eventId: string): Promise<EventFinancialS
         percentage_commission_amount: computed.percentageCommissionAmount,
         fixed_fee_per_paid_ticket: computed.fixedFeePerPaidTicket,
         fixed_ticket_fee_amount: computed.fixedTicketFeeAmount,
+        payment_gateway_fees: computed.paymentGatewayFees,
         total_platform_fees: computed.totalPlatformFees,
         organizer_net_profit: computed.organizerNetProfit,
         amount_paid_to_organizer: amountPaid,
@@ -351,12 +367,22 @@ export interface SetEventCommissionInput {
   customCommissionPercentage?: number | null;
   customFixedFeeEgp?: number | null;
   isLocked?: boolean;
+  reason: string;
   actorId: string;
 }
 
-/** Sets an event's custom commission override. Blocked once the event's commission is locked. */
+/**
+ * Sets an event's custom commission override. A written reason is mandatory
+ * (recorded in the permanent audit log as contract-variation evidence), and
+ * commission auto-locks the moment the event has taken its first paid sale —
+ * the rate a buyer was charged under can never be changed retroactively.
+ */
 export async function setEventCommission(input: SetEventCommissionInput): Promise<EventCommissionSettings> {
   const supabase = createServiceClient();
+
+  if (!input.reason || !input.reason.trim()) {
+    throw new Error('A reason is required to change commission settings.');
+  }
 
   const { data: existing } = await supabase
     .from('event_commission_settings')
@@ -366,6 +392,18 @@ export async function setEventCommission(input: SetEventCommissionInput): Promis
 
   if (existing?.is_locked) {
     throw new Error('Commission settings are locked for this event and cannot be changed.');
+  }
+
+  // Auto-lock: once any paid sale exists, the commission terms are frozen.
+  const { count: paidCount } = await supabase
+    .from('payments')
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', input.eventId)
+    .eq('status', 'paid');
+  if ((paidCount ?? 0) > 0) {
+    throw new Error(
+      'Commission is locked automatically because ticket sales have already begun for this event.'
+    );
   }
 
   const { error: upsertErr } = await supabase.from('event_commission_settings').upsert(
@@ -414,6 +452,7 @@ export async function setEventCommission(input: SetEventCommissionInput): Promis
       custom_fixed_fee_egp: input.customFixedFeeEgp ?? null,
       is_custom_commission_enabled: input.isCustomCommissionEnabled,
     },
+    reason: input.reason.trim(),
   });
 
   const label = await getEventOrgLabel(input.eventId);
@@ -964,4 +1003,128 @@ export async function downloadSettlementStatementPdf(settlementId: string): Prom
   });
 
   return { filename: settlementPdfFilename(organization.name, event.title), base64: Buffer.from(pdfBytes).toString('base64') };
+}
+
+// ─── XPay gateway reconciliation (W3, 2026-07-16) ─────────────────────────────
+
+export interface GatewayEventRow {
+  eventId: string;
+  eventTitle: string;
+  organizationName: string;
+  transactions: number;
+  refundedTransactions: number;
+  grossCollected: number;
+  refundedAmount: number;
+  estimatedXpayFee: number;
+  expectedBankNet: number;
+}
+
+export interface GatewayReconciliation {
+  feePercentage: number;
+  feeFixedEgp: number;
+  totals: {
+    transactions: number;
+    refundedTransactions: number;
+    grossCollected: number;
+    refundedAmount: number;
+    estimatedXpayFee: number;
+    expectedBankNet: number;
+    owedToOrganizers: number;
+    platformMargin: number;
+  };
+  rows: GatewayEventRow[];
+}
+
+/**
+ * Mohamed's bank-reference view: for every event with XPay activity, what was
+ * charged, what XPay deducts (fee % + fixed EGP per paid transaction, from
+ * platform settings), and what should actually land in the Move Beyond bank
+ * account. Refunds are shown separately — XPay's fee treatment on refunds is
+ * not documented, so refunded amounts are excluded from the net estimate.
+ */
+export async function getGatewayReconciliation(filters: { from?: string; to?: string } = {}): Promise<GatewayReconciliation> {
+  const supabase = createServiceClient();
+  const settings = await getPlatformSettings();
+  const pct = Number(settings.xpay_fee_percentage ?? 0);
+  const fixed = Number(settings.xpay_fee_fixed_egp ?? 0);
+
+  let query = supabase
+    .from('payments')
+    .select('event_id, status, amount_total, created_at, event:events(title, organization:organizations(name))')
+    .in('status', ['paid', 'refunded'])
+    .eq('provider', 'xpay');
+  if (filters.from) query = query.gte('created_at', filters.from);
+  if (filters.to) query = query.lte('created_at', filters.to);
+
+  const { data: payments, error } = await query;
+  if (error) throw new Error(`Failed to fetch gateway payments: ${error.message}`);
+
+  const byEvent = new Map<string, GatewayEventRow>();
+  for (const p of payments ?? []) {
+    const eventId = p.event_id as string;
+    const ev = p.event as unknown as { title: string; organization: { name: string } | null } | null;
+    let row = byEvent.get(eventId);
+    if (!row) {
+      row = {
+        eventId,
+        eventTitle: ev?.title ?? 'Unknown event',
+        organizationName: ev?.organization?.name ?? '—',
+        transactions: 0,
+        refundedTransactions: 0,
+        grossCollected: 0,
+        refundedAmount: 0,
+        estimatedXpayFee: 0,
+        expectedBankNet: 0,
+      };
+      byEvent.set(eventId, row);
+    }
+    const amount = Number(p.amount_total ?? 0) / 100;
+    if (p.status === 'refunded') {
+      row.refundedTransactions += 1;
+      row.refundedAmount = round2(row.refundedAmount + amount);
+    } else {
+      row.transactions += 1;
+      row.grossCollected = round2(row.grossCollected + amount);
+    }
+  }
+
+  let owedToOrganizers = 0;
+  for (const row of byEvent.values()) {
+    row.estimatedXpayFee = round2(row.grossCollected * (pct / 100) + row.transactions * fixed);
+    row.expectedBankNet = round2(row.grossCollected - row.estimatedXpayFee);
+  }
+
+  // What the platform still owes organizers overall (net profit across settlements).
+  const eventIds = Array.from(byEvent.keys());
+  if (eventIds.length > 0) {
+    const computedAll = await Promise.all(eventIds.map((id) => computeEventFinancials(id)));
+    owedToOrganizers = round2(computedAll.reduce((sum, c) => sum + c.organizerNetProfit, 0));
+  }
+
+  const rows = Array.from(byEvent.values()).sort((a, b) => b.grossCollected - a.grossCollected);
+  const totals = rows.reduce(
+    (acc, r) => ({
+      transactions: acc.transactions + r.transactions,
+      refundedTransactions: acc.refundedTransactions + r.refundedTransactions,
+      grossCollected: round2(acc.grossCollected + r.grossCollected),
+      refundedAmount: round2(acc.refundedAmount + r.refundedAmount),
+      estimatedXpayFee: round2(acc.estimatedXpayFee + r.estimatedXpayFee),
+      expectedBankNet: round2(acc.expectedBankNet + r.expectedBankNet),
+      owedToOrganizers,
+      platformMargin: 0,
+    }),
+    {
+      transactions: 0,
+      refundedTransactions: 0,
+      grossCollected: 0,
+      refundedAmount: 0,
+      estimatedXpayFee: 0,
+      expectedBankNet: 0,
+      owedToOrganizers,
+      platformMargin: 0,
+    }
+  );
+  totals.platformMargin = round2(totals.expectedBankNet - totals.owedToOrganizers);
+
+  return { feePercentage: pct, feeFixedEgp: fixed, totals, rows };
 }

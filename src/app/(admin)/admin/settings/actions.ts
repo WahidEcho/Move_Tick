@@ -10,6 +10,8 @@ export type EditablePlatformSettings = Pick<
   PlatformSettings,
   | 'commission_percentage'
   | 'fixed_fee_egp'
+  | 'xpay_fee_percentage'
+  | 'xpay_fee_fixed_egp'
   | 'event_expiry_buffer_hours'
   | 'default_timezone'
   | 'org_approval_required'

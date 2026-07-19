@@ -349,6 +349,8 @@ export interface PlatformSettings {
   id: string;
   commission_percentage: number;
   fixed_fee_egp: number;
+  xpay_fee_percentage: number;
+  xpay_fee_fixed_egp: number;
   event_expiry_buffer_hours: number;
   default_timezone: string;
   org_approval_required: boolean;

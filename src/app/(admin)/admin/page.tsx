@@ -178,7 +178,7 @@ export default async function AdminDashboardPage({ searchParams }: AdminDashboar
           />
         </div>
         <p className="text-xs text-muted-foreground">
-          Commission is scaffolded (platform settings + per-org overrides) but not yet deducted at checkout.
+          Buyers pay list price at checkout; commission (event, then organization, then platform default) is deducted from the organizer&rsquo;s payout at settlement.
         </p>
       </section>
 

@@ -17,6 +17,8 @@ export function SettingsForm({ settings }: { settings: PlatformSettings }) {
   const [form, setForm] = useState<EditablePlatformSettings>({
     commission_percentage: settings.commission_percentage,
     fixed_fee_egp: settings.fixed_fee_egp,
+    xpay_fee_percentage: settings.xpay_fee_percentage,
+    xpay_fee_fixed_egp: settings.xpay_fee_fixed_egp,
     event_expiry_buffer_hours: settings.event_expiry_buffer_hours,
     default_timezone: settings.default_timezone,
     org_approval_required: settings.org_approval_required,
@@ -70,7 +72,43 @@ export function SettingsForm({ settings }: { settings: PlatformSettings }) {
         </CardContent>
         <CardFooter>
           <p className="text-xs text-muted-foreground">
-            Applies to organizations without a custom commission override. Scaffolded — not yet deducted at checkout.
+            Applies to organizations without a custom commission override. Buyers pay the listed ticket price at
+            checkout; the platform&rsquo;s cut is deducted from the organizer&rsquo;s payout at settlement.
+          </p>
+        </CardFooter>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">XPay gateway deduction</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label>XPay fee %</Label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              step="0.1"
+              value={form.xpay_fee_percentage}
+              onChange={(e) => setForm((f) => ({ ...f, xpay_fee_percentage: Number(e.target.value) }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>XPay fixed fee per transaction (EGP)</Label>
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.xpay_fee_fixed_egp}
+              onChange={(e) => setForm((f) => ({ ...f, xpay_fee_fixed_egp: Number(e.target.value) }))}
+            />
+          </div>
+        </CardContent>
+        <CardFooter>
+          <p className="text-xs text-muted-foreground">
+            What XPay deducts from each successful transaction before settling to the Move Beyond bank account.
+            Used by the Gateway reconciliation view — update it if XPay&rsquo;s pricing changes.
           </p>
         </CardFooter>
       </Card>
