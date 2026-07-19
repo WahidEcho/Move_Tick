@@ -8,6 +8,7 @@ const ORG_ROLE_HIERARCHY: Record<OrgRole, number> = {
 
 const PLATFORM_ROLE_HIERARCHY: Record<UserRole, number> = {
   admin: 3,
+  support: 2.5,
   organizer: 2,
   attendee: 1,
 };
@@ -84,7 +85,9 @@ export function canAccessOrganizerDashboard(
 }
 
 export function canAccessAdminPanel(platformRole: UserRole): boolean {
-  return isPlatformAdmin(platformRole);
+  // W6: 'support' is the read-only admin tier — sees every console page;
+  // all mutating actions additionally require the full 'admin' role.
+  return isPlatformAdmin(platformRole) || platformRole === 'support';
 }
 
 /**

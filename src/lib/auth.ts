@@ -43,6 +43,13 @@ export async function requireAdmin(): Promise<Profile> {
   return profile;
 }
 
+/** W6: mutations in the admin console need the FULL admin role — 'support' is view-only. */
+export async function requireSuperAdmin(): Promise<Profile> {
+  const profile = await requireAuth();
+  if (profile.platform_role !== 'admin') redirect('/');
+  return profile;
+}
+
 export async function requireOrganizer(organizationId: string): Promise<{
   profile: Profile;
   role: OrgRole;

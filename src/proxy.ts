@@ -155,7 +155,7 @@ export async function proxy(request: NextRequest) {
           .eq('id', user.id)
           .single();
 
-        if (!profile || profile.platform_role !== 'admin') {
+        if (!profile || (profile.platform_role !== 'admin' && profile.platform_role !== 'support')) {
           return NextResponse.redirect(new URL('/', request.url));
         }
       }

@@ -1,6 +1,6 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
-export type UserRole = 'attendee' | 'organizer' | 'admin';
+export type UserRole = 'attendee' | 'organizer' | 'admin' | 'support';
 export type OrgRole = 'owner' | 'admin' | 'manager';
 export type EventStaffRole = 'event_manager' | 'gate_scanner' | 'space_controller' | 'redeemer' | 'support_staff';
 export type ApplicationStatus = 'pending' | 'approved' | 'rejected' | 'more_info_requested';

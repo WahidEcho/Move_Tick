@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireAdmin } from '@/lib/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import {
   adminSetEventHidden,
   adminSetEventPublished,
@@ -15,48 +15,48 @@ import { getExpiryThresholdISO } from '@/lib/event-visibility';
 import { toCSV } from '@/lib/csv';
 
 export async function setEventHiddenAction(eventId: string, hidden: boolean, reason?: string) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   await adminSetEventHidden(eventId, hidden, profile.id, reason || null);
   revalidatePath('/admin/events');
   return { success: true };
 }
 
 export async function setEventPublishedAction(eventId: string, published: boolean, reason?: string) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   await adminSetEventPublished(eventId, published, profile.id, reason || null);
   revalidatePath('/admin/events');
   return { success: true };
 }
 
 export async function archiveEventAction(eventId: string, reason: string) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   await adminArchiveEvent(eventId, profile.id, reason);
   revalidatePath('/admin/events');
   return { success: true };
 }
 
 export async function restoreEventAction(eventId: string, reason?: string) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   await adminRestoreEvent(eventId, profile.id, reason || null);
   revalidatePath('/admin/events');
   return { success: true };
 }
 
 export async function changeEventOrganizerAction(eventId: string, newOrganizationId: string, reason?: string) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   await adminChangeEventOrganizer(eventId, newOrganizationId, profile.id, reason || null);
   revalidatePath('/admin/events');
   return { success: true };
 }
 
 export async function getOrganizationOptions() {
-  await requireAdmin();
+  await requireSuperAdmin();
   const { data } = await getOrganizations({ page_size: 500 });
   return data.map((org) => ({ id: org.id, name: org.name }));
 }
 
 export async function exportEventsAction(): Promise<{ csv: string; error?: string }> {
-  await requireAdmin();
+  await requireSuperAdmin();
   try {
     const [{ data: events }, threshold] = await Promise.all([
       getEventsForAdmin({ page_size: 10000 }),

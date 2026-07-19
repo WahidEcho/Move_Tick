@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireAdmin } from '@/lib/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import {
   approveApplication as approveApplicationService,
   updateApplicationStatus,
@@ -16,7 +16,7 @@ import { orgApprovedEmail, orgRejectedEmail, orgMoreInfoEmail } from '@/lib/emai
 import { getAppUrl as appUrl } from '@/lib/app-url';
 
 export async function approveApplication(applicationId: string) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   const application = await getApplicationById(applicationId);
   const { organizationId } = await approveApplicationService(applicationId, profile.id);
 
@@ -69,7 +69,7 @@ export async function approveApplication(applicationId: string) {
 }
 
 export async function rejectApplication(applicationId: string, notes: string) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   const application = await getApplicationById(applicationId);
   await updateApplicationStatus(applicationId, 'rejected', profile.id, notes);
 
@@ -121,7 +121,7 @@ export async function rejectApplication(applicationId: string, notes: string) {
 }
 
 export async function requestMoreInfo(applicationId: string, notes: string) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   const application = await getApplicationById(applicationId);
   await updateApplicationStatus(applicationId, 'more_info_requested', profile.id, notes);
 

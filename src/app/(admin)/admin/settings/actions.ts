@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireAdmin } from '@/lib/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { getPlatformSettings, updatePlatformSettings } from '@/services/platform-settings.service';
 import { logAdminAction } from '@/services/audit.service';
 import type { Json, PlatformSettings } from '@/types/database.types';
@@ -24,7 +24,7 @@ export type EditablePlatformSettings = Pick<
 >;
 
 export async function updatePlatformSettingsAction(data: EditablePlatformSettings) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   const before = await getPlatformSettings();
   const updated = await updatePlatformSettings(data);
 

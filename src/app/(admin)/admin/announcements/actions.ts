@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireAdmin } from '@/lib/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import {
   createAnnouncement,
   sendAnnouncement,
@@ -24,12 +24,12 @@ export interface ComposerInput {
 }
 
 export async function getAudienceCountAction(audience: AnnouncementAudience): Promise<number> {
-  await requireAdmin();
+  await requireSuperAdmin();
   return getAudienceCount(audience);
 }
 
 export async function previewAnnouncementAction(input: ComposerInput): Promise<string> {
-  await requireAdmin();
+  await requireSuperAdmin();
   const { html } = announcementEmail({
     headline: input.headline || 'Your headline here',
     body: input.body || 'Your message here',
@@ -41,7 +41,7 @@ export async function previewAnnouncementAction(input: ComposerInput): Promise<s
 }
 
 export async function sendTestEmailAction(input: ComposerInput): Promise<void> {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   await sendTestAnnouncementEmail(
     { headline: input.headline, body: input.body, ctaLabel: input.ctaLabel || null, ctaUrl: input.ctaUrl || null },
     profile.email
@@ -50,7 +50,7 @@ export async function sendTestEmailAction(input: ComposerInput): Promise<void> {
 
 /** Creates the announcement row and immediately kicks off the real blast — the only path that writes to announcements/recipients. */
 export async function sendAnnouncementToAudienceAction(input: ComposerInput): Promise<{ announcementId: string }> {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   const created = await createAnnouncement({
     subject: input.subject,
     headline: input.headline,
@@ -68,17 +68,17 @@ export async function sendAnnouncementToAudienceAction(input: ComposerInput): Pr
 
 /** Retries a 'failed' announcement — only re-sends recipients still pending. */
 export async function retryAnnouncementAction(announcementId: string): Promise<void> {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   await sendAnnouncement(announcementId, profile.id);
   revalidatePath('/admin/announcements');
 }
 
 export async function getAnnouncementProgressAction(announcementId: string) {
-  await requireAdmin();
+  await requireSuperAdmin();
   return getAnnouncementProgress(announcementId);
 }
 
 export async function getAnnouncementRecipientsAction(announcementId: string) {
-  await requireAdmin();
+  await requireSuperAdmin();
   return getAnnouncementRecipients(announcementId);
 }

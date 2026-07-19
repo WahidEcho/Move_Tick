@@ -1,11 +1,11 @@
 'use server';
 
-import { requireAdmin } from '@/lib/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase-server';
 import { toCSV } from '@/lib/csv';
 
 export async function exportRevenueAction(): Promise<{ csv: string; error?: string }> {
-  await requireAdmin();
+  await requireSuperAdmin();
   try {
     const supabase = createServiceClient();
     const { data, error } = await supabase

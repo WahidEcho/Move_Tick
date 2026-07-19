@@ -72,6 +72,7 @@ const EMPTY_USER_ROLE: Record<UserRole, number> = {
   attendee: 0,
   organizer: 0,
   admin: 0,
+  support: 0,
 };
 
 export async function getAdminDashboard(range: DashboardRange = '7d'): Promise<AdminDashboardData> {

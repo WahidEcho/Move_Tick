@@ -37,6 +37,7 @@ import {
 const ROLE_OPTIONS = [
   { label: 'Attendee', value: 'attendee' },
   { label: 'Organizer', value: 'organizer' },
+  { label: 'Support admin (view-only)', value: 'support' },
   { label: 'Admin', value: 'admin' },
 ];
 

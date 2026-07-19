@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireAdmin } from '@/lib/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { createServiceClient } from '@/lib/supabase-server';
 import { toCSV } from '@/lib/csv';
 import { PAYOUT_PROOFS_BUCKET } from '@/lib/storage';
@@ -30,7 +30,7 @@ export interface SetCommissionInput {
 }
 
 export async function setCommissionAction(input: SetCommissionInput) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   try {
     await setEventCommission({ ...input, actorId: profile.id });
   } catch (e) {
@@ -56,7 +56,7 @@ export interface RecordPaymentInput {
  * settlement statement — the platform never sends it before this point.
  */
 export async function recordPaymentAction(input: RecordPaymentInput) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   const { settlement, payout } = await recordPayout({ ...input, recordedBy: profile.id });
   const sendResult = await sendSettlementStatement(settlement.id, { payoutRecordId: payout.id });
   revalidatePath('/admin/transactions');
@@ -64,56 +64,56 @@ export async function recordPaymentAction(input: RecordPaymentInput) {
 }
 
 export async function resendStatementAction(settlementId: string) {
-  await requireAdmin();
+  await requireSuperAdmin();
   const result = await sendSettlementStatement(settlementId, { isResend: true });
   revalidatePath('/admin/transactions');
   return result;
 }
 
 export async function markDisputedAction(settlementId: string, reason: string) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   await markSettlementDisputed(settlementId, profile.id, reason);
   revalidatePath('/admin/transactions');
   return { success: true };
 }
 
 export async function addNoteAction(settlementId: string, note: string) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   await addSettlementInternalNote(settlementId, profile.id, note);
   revalidatePath('/admin/transactions');
   return { success: true };
 }
 
 export async function getPayoutHistoryAction(settlementId: string) {
-  await requireAdmin();
+  await requireSuperAdmin();
   return getPayoutHistory(settlementId);
 }
 
 export async function getEventCalculationAction(eventId: string) {
-  await requireAdmin();
+  await requireSuperAdmin();
   return computeEventFinancials(eventId);
 }
 
 export async function downloadStatementAction(settlementId: string) {
-  await requireAdmin();
+  await requireSuperAdmin();
   return downloadSettlementStatementPdf(settlementId);
 }
 
 export async function getPayoutProofSignedUrlAction(path: string): Promise<string | null> {
-  await requireAdmin();
+  await requireSuperAdmin();
   const supabase = createServiceClient();
   const { data } = await supabase.storage.from(PAYOUT_PROOFS_BUCKET).createSignedUrl(path, 300);
   return data?.signedUrl ?? null;
 }
 
 export async function getOrganizationOptionsAction() {
-  await requireAdmin();
+  await requireSuperAdmin();
   const { data } = await getOrganizations({ page_size: 500 });
   return data.map((o) => ({ label: o.name, value: o.id }));
 }
 
 export async function exportTransactionsAction(filters: { search?: string; organizationId?: string; status?: string }) {
-  await requireAdmin();
+  await requireSuperAdmin();
   const listFilters: SettlementListFilters = {
     search: filters.search || undefined,
     organizationId: filters.organizationId || undefined,

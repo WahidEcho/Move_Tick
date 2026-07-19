@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requireAdmin } from '@/lib/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import {
   adminUpdateOrganization,
   adminSetOrgStatus,
@@ -41,7 +41,7 @@ export interface EditableOrgFields {
 }
 
 export async function updateOrganizationAction(orgId: string, data: EditableOrgFields) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   await adminUpdateOrganization(orgId, data as UpdateOrganizationData, profile.id);
   revalidatePath('/admin/organizations');
   return { success: true };
@@ -62,7 +62,7 @@ const STATUS_NOTIFICATION_TYPE: Partial<Record<OrganizationStatus, 'org_suspende
 };
 
 export async function setOrgStatusAction(orgId: string, status: OrganizationStatus, reason?: string) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   const org = await adminSetOrgStatus(orgId, status, profile.id, reason || null);
 
   revalidatePath('/admin/organizations');
@@ -100,7 +100,7 @@ export async function setOrgStatusAction(orgId: string, status: OrganizationStat
 }
 
 export async function archiveOrganizationAction(orgId: string, reason: string) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   const org = await adminArchiveOrganization(orgId, profile.id, reason);
 
   revalidatePath('/admin/organizations');
@@ -133,19 +133,19 @@ export async function archiveOrganizationAction(orgId: string, reason: string) {
 }
 
 export async function restoreOrganizationAction(orgId: string, reason?: string) {
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   await adminRestoreOrganization(orgId, profile.id, reason || null);
   revalidatePath('/admin/organizations');
   return { success: true };
 }
 
 export async function getOrgStatsAction(orgId: string): Promise<OrganizerDashboardSummary> {
-  await requireAdmin();
+  await requireSuperAdmin();
   return getOrganizerDashboardSummary(orgId);
 }
 
 export async function exportOrganizationsAction(): Promise<{ csv: string; error?: string }> {
-  await requireAdmin();
+  await requireSuperAdmin();
   try {
     const { data } = await getOrganizationsForAdmin({ page_size: 10000 });
 
@@ -189,10 +189,10 @@ export async function setContractStatusAction(
   status: 'completed' | 'draft',
   reason?: string | null
 ) {
-  const { requireAdmin } = await import('@/lib/auth');
+  const { requireSuperAdmin } = await import('@/lib/auth');
   const { createServiceClient } = await import('@/lib/supabase-server');
   const { logAdminAction } = await import('@/services/audit.service');
-  const profile = await requireAdmin();
+  const profile = await requireSuperAdmin();
   const supabase = createServiceClient();
 
   const { data: existing } = await supabase
