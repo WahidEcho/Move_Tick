@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       event.data?.object?.status === 'complete'
     ) {
       await fulfillCheckoutCompleted(
-        event.data.object as unknown as { id: string; paymentIntent?: { id?: string } | null }
+        event.data.object as unknown as { id: string; paymentIntent?: { id?: string } | null; amountTotal?: number | null }
       );
     }
   } catch (e) {

@@ -127,6 +127,7 @@ export async function createCheckoutForTickets(
 export async function fulfillCheckoutCompleted(session: {
   id: string;
   paymentIntent?: { id?: string } | null;
+  amountTotal?: number | null;
 }): Promise<void> {
   const supabase = createServiceClient();
   const paymentIntentId = session.paymentIntent?.id ?? null;
@@ -141,6 +142,19 @@ export async function fulfillCheckoutCompleted(session: {
     .maybeSingle();
 
   if (!claimed) return; // already processed (or unknown session) — idempotent no-op
+
+  // Defense in depth: the charged amount must match what we quoted. A
+  // mismatch means tampering or a serious bug — never issue tickets on it.
+  if (
+    session.amountTotal != null &&
+    Number(session.amountTotal) !== Number(claimed.amount_total)
+  ) {
+    await supabase.from('payments').update({ status: 'failed' }).eq('id', claimed.id);
+    console.error(
+      `[xpay] amount mismatch for payment ${claimed.id}: charged ${session.amountTotal}, expected ${claimed.amount_total}`
+    );
+    return;
+  }
 
   try {
     const qty = claimed.quantity as number;
@@ -251,7 +265,7 @@ export async function reconcilePaymentStatus(
 
   if (session.status === 'complete') {
     try {
-      await fulfillCheckoutCompleted({ id: session.id, paymentIntent: session.paymentIntent });
+      await fulfillCheckoutCompleted({ id: session.id, paymentIntent: session.paymentIntent, amountTotal: (session as { amountTotal?: number | null }).amountTotal ?? null });
     } catch (e) {
       console.warn(`[xpay] reconcile fulfillment failed for ${paymentId}:`, e);
       return 'pending'; // will retry on next poll / webhook
