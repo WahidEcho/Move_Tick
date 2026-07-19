@@ -176,6 +176,7 @@ export interface Ticket {
   guest_email: string | null;
   guest_name: string | null;
   invitation_id: string | null;
+  payment_id: string | null;
   qr_code: string | null;
   qr_token: string | null;
   is_active: boolean;
@@ -545,4 +546,23 @@ export interface AnnouncementRecipient {
   error: string | null;
   sent_at: string | null;
   created_at: string;
+}
+
+// ─── W4 (2026-07-16): refund requests ─────────────────────────────────────
+
+export type RefundRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface RefundRequest {
+  id: string;
+  payment_id: string;
+  event_id: string;
+  organization_id: string;
+  requested_by: string;
+  reason: string;
+  status: RefundRequestStatus;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  created_at: string;
+  updated_at: string;
 }

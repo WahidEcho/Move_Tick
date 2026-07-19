@@ -161,6 +161,10 @@ export async function fulfillCheckoutCompleted(session: {
       }
     }
 
+    // Link the tickets to this payment so a refund can deactivate exactly the
+    // tickets bought in this transaction.
+    await supabase.from('tickets').update({ payment_id: claimed.id }).in('id', ticketIds);
+
     await supabase.from('registrations').upsert(
       {
         event_id: claimed.event_id,

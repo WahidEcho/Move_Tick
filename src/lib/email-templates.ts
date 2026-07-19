@@ -484,3 +484,48 @@ export function announcementEmail(data: AnnouncementEmailData): RenderedEmail {
     </td></tr>`;
   return { subject: data.headline, html: shell(inner) };
 }
+
+export interface RefundDecisionEmailData {
+  attendeeName: string | null;
+  eventTitle: string;
+  amountEgp: number;
+  approved: boolean;
+  decisionNote?: string | null;
+}
+
+/** Sent to the attendee when the platform approves or rejects their refund request. */
+export function refundDecisionEmail(data: RefundDecisionEmailData): RenderedEmail {
+  const name = data.attendeeName ? escapeHtml(data.attendeeName.split(' ')[0]) : 'there';
+  const amount = data.amountEgp.toLocaleString('en-US', { minimumFractionDigits: 2 });
+  const inner = data.approved
+    ? `
+    <tr><td style="padding:32px;">
+      <h1 style="margin:0 0 16px 0;color:${NEAR_BLACK};font-size:22px;">Your refund is on its way</h1>
+      <p style="margin:0 0 12px 0;color:#374151;font-size:15px;line-height:1.6;">Hi ${name},</p>
+      <p style="margin:0 0 12px 0;color:#374151;font-size:15px;line-height:1.6;">
+        Your refund request for <strong>${escapeHtml(data.eventTitle)}</strong> was approved.
+        <strong>${amount} EGP</strong> is being returned to your original payment method —
+        depending on your bank, it can take a few business days to appear.
+      </p>
+      <p style="margin:0 0 12px 0;color:#374151;font-size:15px;line-height:1.6;">
+        The ticket(s) from that purchase are no longer valid for entry.
+      </p>
+      ${data.decisionNote ? `<p style="margin:0;color:#6b7280;font-size:13px;line-height:1.6;">Note from the team: ${escapeHtml(data.decisionNote)}</p>` : ''}
+    </td></tr>`
+    : `
+    <tr><td style="padding:32px;">
+      <h1 style="margin:0 0 16px 0;color:${NEAR_BLACK};font-size:22px;">About your refund request</h1>
+      <p style="margin:0 0 12px 0;color:#374151;font-size:15px;line-height:1.6;">Hi ${name},</p>
+      <p style="margin:0 0 12px 0;color:#374151;font-size:15px;line-height:1.6;">
+        We reviewed your refund request for <strong>${escapeHtml(data.eventTitle)}</strong> and
+        weren&rsquo;t able to approve it this time. Your ticket remains valid for the event.
+      </p>
+      ${data.decisionNote ? `<p style="margin:0;color:#374151;font-size:15px;line-height:1.6;">Reason: ${escapeHtml(data.decisionNote)}</p>` : ''}
+    </td></tr>`;
+  return {
+    subject: data.approved
+      ? `Refund approved — ${data.eventTitle}`
+      : `Refund request update — ${data.eventTitle}`,
+    html: shell(inner),
+  };
+}

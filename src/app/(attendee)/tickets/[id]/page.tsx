@@ -1,9 +1,12 @@
 import Link from 'next/link';
 import { requireAuth } from '@/lib/auth';
+import { createServiceClient } from '@/lib/supabase-server';
 import { getTicket } from '@/services/tickets.service';
 import { getMovementsByTicketId } from '@/services/eventMovements.service';
 import { getTicketRedeemBalances } from '@/services/redeems.service';
+import { getRefundStateForPayment } from '@/services/refunds.service';
 import { walletAvailability } from '@/lib/wallet/config';
+import { RefundRequestButton } from './refund-request-button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -47,6 +50,26 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
   // QR/ticket validity ends 24h after the event end.
   const isExpired = isTicketExpired(event?.end_date);
   const isUsable = ticket.is_active && !isExpired;
+
+  // Paid tickets (linked to an XPay payment) can request a refund until the
+  // event has ended; the request is decided by the Move Beyond team.
+  let refundProps: { paymentId: string; amountLabel: string; refundState: 'none' | 'pending' | 'approved' | 'rejected' } | null = null;
+  if (ticket.payment_id && !isExpired) {
+    const supabase = createServiceClient();
+    const { data: payment } = await supabase
+      .from('payments')
+      .select('id, status, amount_total')
+      .eq('id', ticket.payment_id)
+      .maybeSingle();
+    if (payment && (payment.status === 'paid' || payment.status === 'refunded')) {
+      const { status: refundState } = await getRefundStateForPayment(payment.id as string, profile.id);
+      refundProps = {
+        paymentId: payment.id as string,
+        amountLabel: `${(Number(payment.amount_total) / 100).toFixed(2)} EGP`,
+        refundState: payment.status === 'refunded' && refundState === 'none' ? 'approved' : refundState,
+      };
+    }
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -279,6 +302,15 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
               </ul>
             </CardContent>
           </Card>
+        )}
+
+        {/* Refund request (paid tickets only) */}
+        {refundProps && (
+          <RefundRequestButton
+            paymentId={refundProps.paymentId}
+            amountLabel={refundProps.amountLabel}
+            refundState={refundProps.refundState}
+          />
         )}
 
         {/* View Event link */}

@@ -23,6 +23,7 @@ import {
   Wallet,
   Megaphone,
   Landmark,
+  RotateCcw,
 } from 'lucide-react';
 
 const adminNavItems = [
@@ -32,6 +33,7 @@ const adminNavItems = [
   { href: '/admin/events', label: 'Events', icon: CalendarDays },
   { href: '/admin/transactions', label: 'Transactions', icon: Wallet },
   { href: '/admin/gateway', label: 'Gateway (XPay)', icon: Landmark },
+  { href: '/admin/refunds', label: 'Refunds', icon: RotateCcw },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/admin/audit', label: 'Audit Log', icon: ShieldAlert },
