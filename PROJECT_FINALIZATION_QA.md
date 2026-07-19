@@ -306,3 +306,28 @@ No answer needed; this records the evidence behind the review.
 - Commission not deducted at checkout (Part 2.1 / 5.1).
 - Push notifications never send server‑side (5.2).
 - DocuSign is a scaffold (4.5 / 5.3).
+
+---
+
+# IMPLEMENTATION STATUS (2026-07-19)
+
+All answers above were executed in workstreams W0–W10 (commits on main):
+- ✅ W0 hardening + settings (5% commission, 2-event default, XPay fee model, fn grants/search_path, dead table dropped)
+- ✅ W1 XPay sandbox E2E — verified to the 3DS screen; session `cs_test_aZHkI5RbXUEnLHVEv1COM` left open: finish the last Submit click from any browser, the ticket then auto-issues (test event `xpay-sandbox-test-w1`, buyer mohamed.wahid.gm+xpaytest@gmail.com / pw shared in session)
+- ✅ W2 commission model (a) + reason-required + auto-lock at first paid sale
+- ✅ W3 /admin/gateway — XPay deduction vs bank-net reconciliation
+- ✅ W4 refunds: attendee request → /admin/refunds approve/reject (full XPay refund + ticket deactivation + emails)
+- ✅ W5 per-org expiry buffer + expiry emails, rejection cooldown (10min/24h), more-info resubmission, 2-event start + auto-scaling limits, hold removed, auto waitlist promotion, 6-hourly Vercel cron
+- ✅ W6 'support' view-only admin role (assignable from Users)
+- ✅ W8 FCM push mirror of every in-app notification (needs FIREBASE_SERVICE_ACCOUNT_JSON — docs/PUSH_SETUP.md)
+- ✅ W9 contract publish-gate toggle (default OFF) + admin "Mark contract completed" + docs/CONTRACT_TEMPLATE_AR.md
+- ✅ W10 webhook amount assertion; brand logos live in footers
+- ⏳ W7 analytics expansion (revenue-over-time, conversion + view tracking, avg ticket price, check-in/no-show/repeat KPIs) — next session
+
+## Still on Mohamed only
+1. 🔴 Rotate Supabase service-role key + test admin password (1.6 — still open)
+2. 🔴 Finish the one 3DS Submit click (W1 above) to close the payment loop
+3. 🟡 Supabase dashboard → Auth → enable leaked-password protection (3.5)
+4. 🟡 Firebase service-account JSON → Vercel env (push goes live instantly)
+5. 🟡 Add CRON_SECRET env in Vercel (secures /api/cron/housekeeping)
+6. ⚪ XPay live keys + live webhook before the real event; lawyer review of the Arabic contract draft
