@@ -1,3 +1,8 @@
+> **⚠️ SUPERSEDED (2026-07-16):** All open questions from this file have been
+> consolidated — together with the flow/security/XPay review findings — into
+> **`PROJECT_FINALIZATION_QA.md`** (repo root), which has fill-in answer fields.
+> Answer there. This file is kept for history only.
+
 # Super Admin Control Center — Decisions Required
 
 This is the business-decision interview from the Round 5 brief. Four questions
