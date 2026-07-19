@@ -1,4 +1,5 @@
 import { createServiceClient } from './supabase-server';
+import { getPlatformSettings } from '@/services/platform-settings.service';
 import type { Organization } from '@/types/database.types';
 
 /**
@@ -73,6 +74,27 @@ export async function assertCanPublish(orgId: string, isPaid: boolean): Promise<
 
   if (isPaid && !org.can_create_paid) {
     throw new Error("Your organization isn't approved to sell paid tickets yet. Contact Move-Tick support.");
+  }
+
+  // W9 (4.5a): when the platform requires a signed contract, publishing is
+  // blocked until this organization's contract is completed. Toggle lives in
+  // platform_settings.contract_required (default off until DocuSign is live);
+  // an admin can also mark a manually-signed contract completed.
+  const settings = await getPlatformSettings();
+  if (settings.contract_required) {
+    const supabase = createServiceClient();
+    const { data: contract } = await supabase
+      .from('contracts')
+      .select('contract_status')
+      .eq('organization_id', orgId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (contract?.contract_status !== 'completed') {
+      throw new Error(
+        'A signed organizer agreement is required before publishing events. Contact Move-Tick support to complete your contract.'
+      );
+    }
   }
 
   if (org.max_published_events != null) {

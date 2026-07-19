@@ -6,10 +6,11 @@ import {
   MoreVertical,
   Pencil,
   Ban,
-    PlayCircle,
+  PlayCircle,
   BarChart3,
   Archive,
   RotateCcw,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,6 +36,7 @@ import type { OrganizationWithCounts } from '@/services/organizations.service';
 import type { OrganizerDashboardSummary } from '@/types/domain.types';
 import {
   updateOrganizationAction,
+  setContractStatusAction,
   setOrgStatusAction,
   archiveOrganizationAction,
   restoreOrganizationAction,
@@ -48,6 +50,7 @@ export function OrgRowActions({ org }: { org: OrganizationWithCounts }) {
   const [editOpen, setEditOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
+  const [contractDialogOpen, setContractDialogOpen] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [stats, setStats] = useState<OrganizerDashboardSummary | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
@@ -120,6 +123,10 @@ export function OrgRowActions({ org }: { org: OrganizationWithCounts }) {
               Reactivate
             </DropdownMenuItem>
           )}
+          <DropdownMenuItem onClick={() => setContractDialogOpen(true)}>
+            <FileText className="size-4 shrink-0" />
+            Mark contract completed
+          </DropdownMenuItem>
           {org.status !== 'suspended' && (
             <DropdownMenuItem variant="destructive" onClick={() => setSuspendDialogOpen(true)}>
               <Ban className="size-4 shrink-0" />
@@ -288,6 +295,18 @@ export function OrgRowActions({ org }: { org: OrganizationWithCounts }) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ReasonDialog
+        open={contractDialogOpen}
+        onOpenChange={setContractDialogOpen}
+        title={`Mark ${org.name}'s contract as completed?`}
+        description="Confirms a signed organizer agreement is on file (manual signature or DocuSign). When the contract gate is enabled in Settings, this is what allows the organization to publish."
+        confirmLabel="Mark completed"
+        onConfirm={async (reason) => {
+          await setContractStatusAction(org.id, 'completed', reason || null);
+          router.refresh();
+        }}
+      />
 
       <ReasonDialog
         open={suspendDialogOpen}

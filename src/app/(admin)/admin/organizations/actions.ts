@@ -183,3 +183,43 @@ export async function exportOrganizationsAction(): Promise<{ csv: string; error?
     return { csv: '', error: e instanceof Error ? e.message : 'Export failed' };
   }
 }
+
+export async function setContractStatusAction(
+  organizationId: string,
+  status: 'completed' | 'draft',
+  reason?: string | null
+) {
+  const { requireAdmin } = await import('@/lib/auth');
+  const { createServiceClient } = await import('@/lib/supabase-server');
+  const { logAdminAction } = await import('@/services/audit.service');
+  const profile = await requireAdmin();
+  const supabase = createServiceClient();
+
+  const { data: existing } = await supabase
+    .from('contracts')
+    .select('id, contract_status')
+    .eq('organization_id', organizationId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existing) {
+    await supabase
+      .from('contracts')
+      .update({ contract_status: status, updated_at: new Date().toISOString() })
+      .eq('id', existing.id);
+  } else {
+    await supabase.from('contracts').insert({ organization_id: organizationId, contract_status: status });
+  }
+
+  await logAdminAction({
+    actorId: profile.id,
+    action: 'organization.set_contract_status',
+    targetType: 'organization',
+    targetId: organizationId,
+    previousValue: { contract_status: existing?.contract_status ?? null },
+    newValue: { contract_status: status },
+    reason: reason ?? null,
+  });
+  return { success: true };
+}

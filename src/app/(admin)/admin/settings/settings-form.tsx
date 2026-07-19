@@ -22,6 +22,7 @@ export function SettingsForm({ settings }: { settings: PlatformSettings }) {
     event_expiry_buffer_hours: settings.event_expiry_buffer_hours,
     default_timezone: settings.default_timezone,
     org_approval_required: settings.org_approval_required,
+    contract_required: settings.contract_required,
     default_max_events: settings.default_max_events,
     default_event_duration_hours: settings.default_event_duration_hours,
     support_email: settings.support_email,
@@ -166,6 +167,19 @@ export function SettingsForm({ settings }: { settings: PlatformSettings }) {
                 }
               />
             </div>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-border p-3">
+            <div>
+              <p className="text-sm font-medium">Require a completed contract before publishing</p>
+              <p className="text-xs text-muted-foreground">
+                When on, organizations can&rsquo;t publish events until their organizer agreement is marked
+                completed (DocuSign or manually by an admin).
+              </p>
+            </div>
+            <Switch
+              checked={form.contract_required}
+              onCheckedChange={(v) => setForm((f) => ({ ...f, contract_required: v }))}
+            />
           </div>
           <div className="flex items-center justify-between rounded-lg border border-border p-3">
             <div>

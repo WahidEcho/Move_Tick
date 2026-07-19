@@ -29,6 +29,7 @@ export async function updatePlatformSettings(
       | 'event_expiry_buffer_hours'
       | 'default_timezone'
       | 'org_approval_required'
+      | 'contract_required'
       | 'default_max_events'
       | 'default_event_duration_hours'
       | 'support_email'

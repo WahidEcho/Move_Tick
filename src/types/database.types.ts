@@ -355,6 +355,7 @@ export interface PlatformSettings {
   event_expiry_buffer_hours: number;
   default_timezone: string;
   org_approval_required: boolean;
+  contract_required: boolean;
   default_max_events: number | null;
   default_event_duration_hours: number | null;
   support_email: string;
