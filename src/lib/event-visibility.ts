@@ -64,3 +64,18 @@ export function isPubliclyVisible(
 export function isExpired(event: Pick<Event, 'end_date'>, thresholdISO: string): boolean {
   return event.end_date < thresholdISO;
 }
+
+/**
+ * Org-aware expiry threshold: organizations can override the platform buffer
+ * (organizations.event_expiry_buffer_hours). Returns the ISO instant an event
+ * of that org must end after to still be publicly visible.
+ */
+export async function getOrgAwareThresholdISO(orgBufferHours: number | null | undefined): Promise<string> {
+  const hours = orgBufferHours ?? (await getEventExpiryBufferHours());
+  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+}
+
+/** Widest DB-level prefilter (matches the 72h anon RLS backstop); JS narrows per org. */
+export function maxExpiryThresholdISO(): string {
+  return new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+}

@@ -424,3 +424,36 @@ export async function exportAttendees(
     };
   });
 }
+
+/**
+ * W5 (4.8): automatic waitlist promotion. Promotes the oldest waitlisted
+ * registration that now has capacity (optionally scoped to one ticket type).
+ * Called after refunds free seats and by the housekeeping cron as a sweep.
+ * Best-effort: capacity races just leave the person waitlisted for next time.
+ */
+export async function tryPromoteOldestWaitlisted(
+  eventId: string,
+  ticketTypeId?: string | null
+): Promise<number> {
+  const supabase = createServiceClient();
+  let query = supabase
+    .from('registrations')
+    .select('id')
+    .eq('event_id', eventId)
+    .eq('status', 'waitlisted')
+    .order('created_at', { ascending: true })
+    .limit(5);
+  if (ticketTypeId) query = query.eq('ticket_type_id', ticketTypeId);
+  const { data: waitlisted } = await query;
+
+  let promoted = 0;
+  for (const row of waitlisted ?? []) {
+    try {
+      await promoteFromWaitlist(row.id as string);
+      promoted += 1;
+    } catch {
+      break; // no capacity left (or transient) — stop sweeping
+    }
+  }
+  return promoted;
+}

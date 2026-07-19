@@ -288,3 +288,70 @@ export async function getUserApplication(
   if (error) throw new Error(`Failed to fetch user application: ${error.message}`);
   return data as OrganizerApplicationWithProfile | null;
 }
+
+/**
+ * W5 (4.2b): rejection cooldown. One rejection = 10 minutes before the next
+ * attempt; two or more = 24 hours after the most recent rejection.
+ */
+export async function getRejectionCooldown(userId: string): Promise<{ blockedUntil: Date | null }> {
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from('organizer_applications')
+    .select('status, reviewed_at')
+    .eq('user_id', userId)
+    .eq('status', 'rejected')
+    .order('reviewed_at', { ascending: false });
+  const rejections = (data ?? []).filter((r) => r.reviewed_at);
+  if (rejections.length === 0) return { blockedUntil: null };
+  const last = new Date(rejections[0].reviewed_at as string).getTime();
+  const cooldownMs = rejections.length >= 2 ? 24 * 60 * 60 * 1000 : 10 * 60 * 1000;
+  return { blockedUntil: new Date(last + cooldownMs) };
+}
+
+/**
+ * W5 (4.2c): "request more info" resubmission — updates the SAME application
+ * (preserving the admin's notes/history) and puts it back in the pending queue.
+ */
+export async function resubmitApplication(
+  userId: string,
+  data: SubmitApplicationData
+): Promise<OrganizerApplication> {
+  const supabase = createServiceClient();
+  const { data: existing } = await supabase
+    .from('organizer_applications')
+    .select('id, status')
+    .eq('user_id', userId)
+    .eq('status', 'more_info_requested')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!existing) throw new Error('No application awaiting more information');
+
+  const { data: updated, error } = await supabase
+    .from('organizer_applications')
+    .update({
+      full_name: data.full_name,
+      email: data.email,
+      phone: data.phone ?? null,
+      role_title: data.role_title ?? null,
+      organization_name: data.organization_name,
+      organization_type: data.organization_type ?? null,
+      website: data.website ?? null,
+      instagram: data.instagram ?? null,
+      linkedin: data.linkedin ?? null,
+      country: data.country ?? null,
+      city: data.city ?? null,
+      organization_description: data.organization_description ?? null,
+      event_categories: data.event_categories ?? null,
+      expected_events_per_month: data.expected_events_per_month ?? null,
+      expected_avg_attendees: data.expected_avg_attendees ?? null,
+      terms_accepted: data.terms_accepted,
+      status: 'pending',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', existing.id)
+    .select()
+    .single();
+  if (error || !updated) throw new Error(`Failed to resubmit application: ${error?.message}`);
+  return updated as OrganizerApplication;
+}

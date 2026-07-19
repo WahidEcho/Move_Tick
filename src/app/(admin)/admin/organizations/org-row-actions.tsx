@@ -6,8 +6,7 @@ import {
   MoreVertical,
   Pencil,
   Ban,
-  PauseCircle,
-  PlayCircle,
+    PlayCircle,
   BarChart3,
   Archive,
   RotateCcw,
@@ -48,7 +47,6 @@ export function OrgRowActions({ org }: { org: OrganizationWithCounts }) {
   const [isPending, startTransition] = useTransition();
   const [editOpen, setEditOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
-  const [holdDialogOpen, setHoldDialogOpen] = useState(false);
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [stats, setStats] = useState<OrganizerDashboardSummary | null>(null);
@@ -120,12 +118,6 @@ export function OrgRowActions({ org }: { org: OrganizationWithCounts }) {
             >
               <PlayCircle className="size-4 shrink-0" />
               Reactivate
-            </DropdownMenuItem>
-          )}
-          {org.status !== 'on_hold' && (
-            <DropdownMenuItem onClick={() => setHoldDialogOpen(true)}>
-              <PauseCircle className="size-4 shrink-0" />
-              Put on hold
             </DropdownMenuItem>
           )}
           {org.status !== 'suspended' && (
@@ -296,19 +288,6 @@ export function OrgRowActions({ org }: { org: OrganizationWithCounts }) {
           </div>
         </DialogContent>
       </Dialog>
-
-      <ReasonDialog
-        open={holdDialogOpen}
-        onOpenChange={setHoldDialogOpen}
-        title={`Put ${org.name} on hold?`}
-        description="The organization keeps its data but can't create or publish new events while on hold."
-        confirmLabel="Put on hold"
-        reasonRequired
-        onConfirm={async (reason) => {
-          await setOrgStatusAction(org.id, 'on_hold', reason);
-          router.refresh();
-        }}
-      />
 
       <ReasonDialog
         open={suspendDialogOpen}

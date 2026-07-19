@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase-server';
 import { refundPayment } from './payments.service';
+import { tryPromoteOldestWaitlisted } from './attendees.service';
 import { createNotification } from './notifications.service';
 import { logAdminAction } from './audit.service';
 import { sendAdminOrgAlert } from './admin-alerts.service';
@@ -203,6 +204,8 @@ export async function decideRefundRequest(input: {
           .from('ticket_types')
           .update({ sold_count: Math.max(0, Number(tt?.sold_count ?? 0) - count), updated_at: new Date().toISOString() })
           .eq('id', typeId);
+        // Freed capacity — give it to the waitlist automatically.
+        await tryPromoteOldestWaitlisted(request.event_id as string, typeId).catch(() => 0);
       }
     }
   }

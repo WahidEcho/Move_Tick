@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { getProfile } from '@/lib/auth';
-import { submitApplication, getUserApplication } from '@/services/organizerApplications.service';
+import { submitApplication, getUserApplication, resubmitApplication, getRejectionCooldown } from '@/services/organizerApplications.service';
 import type { OrganizerApplicationWithProfile } from '@/services/organizerApplications.service';
 import type { OrganizerApplicationInput } from '@/lib/validations';
 import { sendAdminOrgAlert } from '@/services/admin-alerts.service';
@@ -22,8 +22,24 @@ export async function submitApplyOrganizer(
     redirect('/login?redirect=/apply-organizer');
   }
 
+  // W5 (4.2b): rejection cooldown — 10 min after the first rejection, 24h
+  // after the second and any later one.
+  const cooldown = await getRejectionCooldown(profile.id);
+  if (cooldown.blockedUntil && cooldown.blockedUntil.getTime() > Date.now()) {
+    const mins = Math.ceil((cooldown.blockedUntil.getTime() - Date.now()) / 60000);
+    return {
+      success: false,
+      error: `You can re-apply in ${mins >= 60 ? Math.ceil(mins / 60) + ' hour(s)' : mins + ' minute(s)'}.`,
+    };
+  }
+
+  // W5 (4.2c): if the admin asked for more info, this submission UPDATES the
+  // existing application back to pending instead of opening a duplicate.
+  const existing = await getUserApplication(profile.id);
+  const isResubmission = existing?.status === 'more_info_requested';
+
   try {
-    await submitApplication(profile.id, {
+    await (isResubmission ? resubmitApplication : submitApplication)(profile.id, {
       full_name: data.full_name,
       email: data.email,
       phone: data.phone ?? null,
@@ -44,7 +60,9 @@ export async function submitApplyOrganizer(
     revalidatePath('/apply-organizer');
 
     await sendAdminOrgAlert({
-      action: 'New organizer application submitted',
+      action: isResubmission
+        ? 'Organizer application resubmitted with requested info'
+        : 'New organizer application submitted',
       organizationName: data.organization_name,
       contactEmail: data.email,
       contactPhone: data.phone ?? null,

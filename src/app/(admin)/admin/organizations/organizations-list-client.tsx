@@ -15,7 +15,6 @@ const STATUS_FILTER_OPTIONS = [
   { label: 'All', value: '' },
   { label: 'Active', value: 'active' },
   { label: 'Suspended', value: 'suspended' },
-  { label: 'On hold', value: 'on_hold' },
   { label: 'Pending', value: 'pending' },
   { label: 'Rejected', value: 'rejected' },
 ];

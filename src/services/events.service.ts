@@ -1,5 +1,5 @@
 import { createServiceClient } from '@/lib/supabase-server';
-import { getExpiryThresholdISO } from '@/lib/event-visibility';
+import { getExpiryThresholdISO, getEventExpiryBufferHours, maxExpiryThresholdISO } from '@/lib/event-visibility';
 import type {
   Event,
   EventSettings,
@@ -220,7 +220,7 @@ export async function getEvents(
     .select(
       `
       *,
-      organization:organizations(id, name, slug)
+      organization:organizations(id, name, slug, event_expiry_buffer_hours)
     `,
       { count: 'exact' }
     );
@@ -236,12 +236,14 @@ export async function getEvents(
     );
   }
   if (excludeExpiredAndHidden) {
-    const threshold = await getExpiryThresholdISO();
+    // DB prefilter at the widest allowed window (72h); the per-organization
+    // buffer override (organizations.event_expiry_buffer_hours, else the
+    // platform default) is applied per row below.
     query = query
       .eq('is_cancelled', false)
       .eq('is_hidden', false)
       .is('archived_at', null)
-      .gte('end_date', threshold);
+      .gte('end_date', maxExpiryThresholdISO());
   }
 
   const from = (page - 1) * page_size;
@@ -252,9 +254,23 @@ export async function getEvents(
 
   if (error) throw new Error(`Failed to fetch events: ${error.message}`);
 
-  const total = count ?? 0;
+  let rows = (data ?? []) as EventWithDetails[];
+  let total = count ?? 0;
+  if (excludeExpiredAndHidden) {
+    const defaultBuffer = await getEventExpiryBufferHours();
+    const now = Date.now();
+    const before = rows.length;
+    rows = rows.filter((ev) => {
+      const orgBuffer = (ev.organization as unknown as { event_expiry_buffer_hours?: number | null } | null)
+        ?.event_expiry_buffer_hours;
+      const bufferHours = orgBuffer ?? defaultBuffer;
+      return new Date(ev.end_date).getTime() + bufferHours * 60 * 60 * 1000 > now;
+    });
+    total -= before - rows.length;
+  }
+
   return {
-    data: (data ?? []) as EventWithDetails[],
+    data: rows,
     total,
     page,
     page_size,
@@ -418,7 +434,7 @@ export async function getOrganizationEvents(
     .select(
       `
       *,
-      organization:organizations(id, name, slug)
+      organization:organizations(id, name, slug, event_expiry_buffer_hours)
     `,
       { count: 'exact' }
     )
