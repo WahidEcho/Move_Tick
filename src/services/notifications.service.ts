@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase-server';
+import { sendPushToUser } from './push.service';
 import type { AppNotification, NotificationType } from '@/types/database.types';
 import type { PaginatedResult } from '@/types/domain.types';
 
@@ -30,6 +31,18 @@ export async function createNotification(data: CreateNotificationData): Promise<
   if (error) {
     console.error(`[notifications] failed to create notification for ${data.userId}:`, error.message);
   }
+
+  // W8: mirror every in-app notification as a mobile push (no-op until the
+  // Firebase service-account env is configured). Never blocks the caller.
+  sendPushToUser(data.userId, {
+    title: data.title,
+    body: data.message,
+    data: {
+      type: data.type,
+      ...(data.relatedEntityType ? { entity_type: data.relatedEntityType } : {}),
+      ...(data.relatedEntityId ? { entity_id: data.relatedEntityId } : {}),
+    },
+  }).catch((e) => console.warn('[notifications] push mirror failed:', e));
 }
 
 export async function getUserNotifications(
