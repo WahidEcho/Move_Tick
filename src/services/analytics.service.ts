@@ -452,3 +452,214 @@ export async function getAttendanceTrend(eventId: string): Promise<AttendanceTre
     };
   });
 }
+
+// ─── W7 (2026-07-19): revenue trend, conversion, avg ticket price, engagement KPIs ───
+
+export interface RevenueTrendPoint {
+  date: string;
+  revenue: number; // EGP
+}
+
+export interface PlatformEngagement {
+  uniqueViews: number;
+  registrations: number;
+  conversionRate: number; // registrations / uniqueViews (0–1)
+  paidRevenue: number; // EGP
+  paidTicketCount: number;
+  avgTicketPrice: number; // EGP per paid ticket
+  issuedTickets: number;
+  checkedIn: number;
+  checkInRate: number; // 0–1 (all events in scope)
+  noShowRate: number; // 0–1 (ended events only)
+  repeatAttendeeRate: number; // 0–1 (attendees with ≥2 distinct events, org/date scope)
+}
+
+/** Event ids matching the org/event/status/date filters (the scope for money + views metrics). */
+async function getFilteredEventIds(filters: PlatformAnalyticsFilters): Promise<string[]> {
+  const supabase = createServiceClient();
+  const { dateFrom, dateTo, organizationId, eventId, status } = filters;
+
+  let q = supabase.from('events').select('id');
+  if (organizationId) q = q.eq('organization_id', organizationId);
+  if (eventId) q = q.eq('id', eventId);
+  if (status === 'published') q = q.eq('is_published', true).eq('is_cancelled', false);
+  if (status === 'draft') q = q.eq('is_published', false).eq('is_cancelled', false);
+  if (status === 'cancelled') q = q.eq('is_cancelled', true);
+  if (dateFrom) q = q.gte('created_at', dateFrom);
+  if (dateTo) q = q.lte('created_at', dateTo);
+
+  const { data, error } = await q;
+  if (error) throw new Error(`Failed to resolve event scope: ${error.message}`);
+  return (data ?? []).map((e) => e.id as string);
+}
+
+/** Paid-revenue per day (EGP), scoped to the filters, over `days` days. */
+export async function getPlatformRevenueTrend(
+  filters: PlatformAnalyticsFilters = {},
+  days: number = 30
+): Promise<RevenueTrendPoint[]> {
+  const supabase = createServiceClient();
+  const eventIds = await getFilteredEventIds(filters);
+
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  const startStr = filters.dateFrom ?? startDate.toISOString();
+
+  const byDate = new Map<string, number>();
+  for (let d = 0; d <= days; d++) {
+    const dt = new Date(startDate);
+    dt.setDate(dt.getDate() + d);
+    byDate.set(dt.toISOString().split('T')[0], 0);
+  }
+
+  if (eventIds.length > 0) {
+    let q = supabase
+      .from('payments')
+      .select('amount_total, created_at')
+      .eq('status', 'paid')
+      .in('event_id', eventIds)
+      .gte('created_at', startStr);
+    if (filters.dateTo) q = q.lte('created_at', filters.dateTo);
+    const { data } = await q;
+    for (const p of data ?? []) {
+      const date = (p.created_at as string).split('T')[0];
+      if (byDate.has(date)) {
+        byDate.set(date, (byDate.get(date) ?? 0) + Number(p.amount_total) / 100);
+      }
+    }
+  }
+
+  return Array.from(byDate.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, revenue]) => ({ date, revenue: Math.round(revenue * 100) / 100 }));
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/** Applies a created_at window to a Supabase query builder (loosely typed to
+ *  avoid the builder's deep generic recursion). */
+function applyCreatedRange<T>(q: T, from?: string, to?: string): T {
+  let out = q as any;
+  if (from) out = out.gte('created_at', from);
+  if (to) out = out.lte('created_at', to);
+  return out as T;
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/**
+ * Conversion funnel + engagement KPIs for the admin analytics page.
+ * Repeat-attendee rate is inherently cross-event, so it honors org/status/date
+ * scope but ignores a single-event filter.
+ */
+export async function getPlatformEngagement(filters: PlatformAnalyticsFilters = {}): Promise<PlatformEngagement> {
+  const supabase = createServiceClient();
+  const eventIds = await getFilteredEventIds(filters);
+
+  if (eventIds.length === 0) {
+    return {
+      uniqueViews: 0, registrations: 0, conversionRate: 0,
+      paidRevenue: 0, paidTicketCount: 0, avgTicketPrice: 0,
+      issuedTickets: 0, checkedIn: 0, checkInRate: 0, noShowRate: 0, repeatAttendeeRate: 0,
+    };
+  }
+
+  const { dateFrom, dateTo } = filters;
+  // Apply the date window as a plain filter object to avoid Supabase's deep
+  // generic recursion on chained builders.
+  const dateFilter: Record<string, string> = {};
+  const viewsQ = supabase.from('event_page_views').select('session_id, event_id').in('event_id', eventIds);
+  const regsQ = supabase.from('registrations').select('user_id, event_id, status').in('event_id', eventIds);
+  const paidQ = supabase.from('payments').select('amount_total, quantity').eq('status', 'paid').in('event_id', eventIds);
+  const ticketsQ = supabase.from('tickets').select('id, event_id').eq('is_active', true).in('event_id', eventIds);
+  const checkinsQ = supabase.from('event_movements').select('ticket_id').eq('movement_type', 'check_in').in('event_id', eventIds);
+  void dateFilter;
+
+  const [viewRows, regRows, paidRows, ticketRows, checkinRows, endedEvents] = await Promise.all([
+    dateFrom || dateTo ? applyCreatedRange(viewsQ, dateFrom, dateTo) : viewsQ,
+    dateFrom || dateTo ? applyCreatedRange(regsQ, dateFrom, dateTo) : regsQ,
+    dateFrom || dateTo ? applyCreatedRange(paidQ, dateFrom, dateTo) : paidQ,
+    dateFrom || dateTo ? applyCreatedRange(ticketsQ, dateFrom, dateTo) : ticketsQ,
+    dateFrom || dateTo ? applyCreatedRange(checkinsQ, dateFrom, dateTo) : checkinsQ,
+    supabase.from('events').select('id').in('id', eventIds).lt('end_date', new Date().toISOString()),
+  ]);
+
+  // Unique views: distinct session per event.
+  const viewKeys = new Set((viewRows.data ?? []).map((v) => `${v.event_id}:${v.session_id}`));
+  const uniqueViews = viewKeys.size;
+
+  const confirmedRegs = (regRows.data ?? []).filter((r) => ['confirmed', 'approved'].includes(r.status as string));
+  const registrations = confirmedRegs.length;
+  const conversionRate = uniqueViews > 0 ? registrations / uniqueViews : 0;
+
+  let paidRevenueMinor = 0;
+  let paidTicketCount = 0;
+  for (const p of paidRows.data ?? []) {
+    paidRevenueMinor += Number(p.amount_total ?? 0);
+    paidTicketCount += Number(p.quantity ?? 0);
+  }
+  const paidRevenue = Math.round((paidRevenueMinor / 100) * 100) / 100;
+  const avgTicketPrice = paidTicketCount > 0 ? Math.round((paidRevenueMinor / 100 / paidTicketCount) * 100) / 100 : 0;
+
+  const issuedTickets = (ticketRows.data ?? []).length;
+  const checkedInSet = new Set((checkinRows.data ?? []).map((m) => m.ticket_id as string));
+  const checkedIn = checkedInSet.size;
+  const checkInRate = issuedTickets > 0 ? Math.min(1, checkedIn / issuedTickets) : 0;
+
+  // No-show rate over ENDED events only.
+  const endedIds = new Set((endedEvents.data ?? []).map((e) => e.id as string));
+  let endedIssued = 0;
+  const endedTicketIds = new Set<string>();
+  for (const t of ticketRows.data ?? []) {
+    if (endedIds.has(t.event_id as string)) {
+      endedIssued += 1;
+      endedTicketIds.add(t.id as string);
+    }
+  }
+  let endedCheckedIn = 0;
+  for (const tid of checkedInSet) if (endedTicketIds.has(tid)) endedCheckedIn += 1;
+  const noShowRate = endedIssued > 0 ? Math.max(0, (endedIssued - endedCheckedIn) / endedIssued) : 0;
+
+  // Repeat-attendee rate: cross-event, so ignore a single-event filter.
+  const repeatAttendeeRate = await computeRepeatAttendeeRate({ ...filters, eventId: undefined });
+
+  return {
+    uniqueViews,
+    registrations,
+    conversionRate,
+    paidRevenue,
+    paidTicketCount,
+    avgTicketPrice,
+    issuedTickets,
+    checkedIn,
+    checkInRate,
+    noShowRate,
+    repeatAttendeeRate,
+  };
+}
+
+/** Share of attendees (confirmed/approved) who appear across ≥2 distinct events. */
+async function computeRepeatAttendeeRate(filters: PlatformAnalyticsFilters): Promise<number> {
+  const eventIds = await getFilteredEventIds(filters);
+  if (eventIds.length < 2) return 0;
+  const supabase = createServiceClient();
+
+  let q = supabase
+    .from('registrations')
+    .select('user_id, event_id, status')
+    .in('event_id', eventIds)
+    .in('status', ['confirmed', 'approved']);
+  if (filters.dateFrom) q = q.gte('created_at', filters.dateFrom);
+  if (filters.dateTo) q = q.lte('created_at', filters.dateTo);
+  const { data } = await q;
+
+  const eventsByUser = new Map<string, Set<string>>();
+  for (const r of data ?? []) {
+    const set = eventsByUser.get(r.user_id as string) ?? new Set<string>();
+    set.add(r.event_id as string);
+    eventsByUser.set(r.user_id as string, set);
+  }
+  const total = eventsByUser.size;
+  if (total === 0) return 0;
+  let repeat = 0;
+  for (const set of eventsByUser.values()) if (set.size >= 2) repeat += 1;
+  return repeat / total;
+}

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { RegisterDialog } from './register-dialog';
+import { TrackEventView } from './track-view';
 import { isOptimizableImage } from '../event-card';
 import { formatEgp } from '@/lib/helpers';
 import { linkify } from '@/lib/linkify';
@@ -89,6 +90,8 @@ export default async function EventPage({ params }: EventPageProps) {
 
   return (
     <div className="min-h-screen">
+      {/* W7: record a public page view (deduped server-side) for conversion analytics */}
+      <TrackEventView eventId={event.id} authed={false} />
       {/* Cover — full image always visible (object-contain), blurred copy fills the backdrop */}
       <div className="relative h-64 w-full overflow-hidden bg-gradient-to-br from-primary/30 via-primary/20 to-muted sm:h-96">
         {event.cover_image_url ? (

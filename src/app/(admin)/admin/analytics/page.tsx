@@ -1,5 +1,11 @@
 import { requireAdmin } from '@/lib/auth';
-import { getPlatformAnalytics, getPlatformRegistrationTrend, type PlatformAnalyticsFilters } from '@/services/analytics.service';
+import {
+  getPlatformAnalytics,
+  getPlatformRegistrationTrend,
+  getPlatformRevenueTrend,
+  getPlatformEngagement,
+  type PlatformAnalyticsFilters,
+} from '@/services/analytics.service';
 import { getOrganizations } from '@/services/organizations.service';
 import { getEventsForAdmin } from '@/services/events.service';
 import { StatCard } from '@/components/layout/stat-card';
@@ -12,7 +18,17 @@ import {
   Calendar,
   Users,
   UserPlus,
+  Eye,
+  Percent,
+  Ticket,
+  CircleCheck,
+  UserX,
+  Repeat,
+  Banknote,
 } from 'lucide-react';
+
+const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+const egp = (n: number) => `${n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} EGP`;
 
 interface AnalyticsPageProps {
   searchParams: Promise<{
@@ -46,9 +62,12 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
     ticketType: (params.ticketType as PlatformAnalyticsFilters['ticketType']) || undefined,
   };
 
-  const [analytics, trend, orgsResult, eventsResult] = await Promise.all([
+  const trendDays = days === 90 ? 90 : 30;
+  const [analytics, trend, revenueTrend, engagement, orgsResult, eventsResult] = await Promise.all([
     getPlatformAnalytics(filters),
-    getPlatformRegistrationTrend(filters, days === 90 ? 90 : 30),
+    getPlatformRegistrationTrend(filters, trendDays),
+    getPlatformRevenueTrend(filters, trendDays),
+    getPlatformEngagement(filters),
     getOrganizations({ page_size: 500 }),
     getEventsForAdmin({ page_size: 500 }),
   ]);
@@ -63,6 +82,16 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
     { title: 'Events', value: analytics.total_events, icon: Calendar },
     { title: 'Total Attendees', value: analytics.total_attendees, icon: Users },
     { title: 'Total Registrations', value: analytics.total_registrations, icon: UserPlus },
+  ];
+
+  const kpiCards = [
+    { title: 'Event page views', value: engagement.uniqueViews.toLocaleString(), description: 'unique visitors (deduped/day)', icon: Eye },
+    { title: 'Conversion rate', value: pct(engagement.conversionRate), description: 'views → registrations', icon: Percent },
+    { title: 'Avg ticket price', value: egp(engagement.avgTicketPrice), description: `${engagement.paidTicketCount.toLocaleString()} paid tickets`, icon: Ticket },
+    { title: 'Paid revenue', value: egp(engagement.paidRevenue), description: 'gross of commission', icon: Banknote },
+    { title: 'Check-in rate', value: pct(engagement.checkInRate), description: `${engagement.checkedIn.toLocaleString()} of ${engagement.issuedTickets.toLocaleString()} tickets`, icon: CircleCheck },
+    { title: 'No-show rate', value: pct(engagement.noShowRate), description: 'ended events only', icon: UserX },
+    { title: 'Repeat attendees', value: pct(engagement.repeatAttendeeRate), description: 'attended ≥2 events in range', icon: Repeat },
   ];
 
   return (
@@ -102,7 +131,32 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         ))}
       </div>
 
-      <AnalyticsCharts data={trend} />
+      <div>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Engagement & conversion
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {kpiCards.map((stat) => (
+            <StatCard
+              key={stat.title}
+              title={stat.title}
+              value={stat.value}
+              description={stat.description}
+              icon={stat.icon}
+            />
+          ))}
+        </div>
+      </div>
+
+      <AnalyticsCharts
+        registrationTrend={trend}
+        revenueTrend={revenueTrend}
+        funnel={{
+          uniqueViews: engagement.uniqueViews,
+          registrations: engagement.registrations,
+          paidTicketCount: engagement.paidTicketCount,
+        }}
+      />
     </div>
   );
 }

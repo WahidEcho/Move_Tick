@@ -25,6 +25,8 @@ function isPublicRoute(pathname: string): boolean {
   if (pathname.startsWith('/api/auth')) return true;
   if (pathname.startsWith('/api/webhooks')) return true; // provider webhooks self-authenticate (signature)
   if (pathname.startsWith('/api/mobile')) return true; // mobile app self-authenticates (Bearer token)
+  if (pathname.startsWith('/api/track')) return true; // anonymous analytics beacon (no auth, no PII)
+  if (pathname.startsWith('/api/cron')) return true; // cron self-authenticates via CRON_SECRET
   // Wallet passes self-authenticate (cookie session OR the ticket's secret
   // token) so guests can add to wallet straight from the invitation email.
   if (/^\/api\/tickets\/[^/]+\/(apple-pass|google-pass)$/.test(pathname)) return true;
