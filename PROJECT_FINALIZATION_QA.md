@@ -322,7 +322,7 @@ All answers above were executed in workstreams W0–W10 (commits on main):
 - ✅ W8 FCM push mirror of every in-app notification (needs FIREBASE_SERVICE_ACCOUNT_JSON — docs/PUSH_SETUP.md)
 - ✅ W9 contract publish-gate toggle (default OFF) + admin "Mark contract completed" + docs/CONTRACT_TEMPLATE_AR.md
 - ✅ W10 webhook amount assertion; brand logos live in footers
-- ⏳ W7 analytics expansion (revenue-over-time, conversion + view tracking, avg ticket price, check-in/no-show/repeat KPIs) — next session
+- ✅ W7 analytics expansion — page-view tracking (/api/track/view, deduped), revenue-over-time chart, views→registrations→paid funnel, and KPI row (conversion, avg ticket price, paid revenue, check-in rate, no-show rate, repeat-attendee rate) on /admin/analytics
 
 ## Still on Mohamed only
 1. 🔴 Rotate Supabase service-role key + test admin password (1.6 — still open)
