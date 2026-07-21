@@ -53,6 +53,11 @@ export async function PublicFooter() {
             <Image src="/brand/mb-logo-white.png" alt="" width={16} height={22} className="hidden h-4 w-auto opacity-70 dark:block" />
             A Move Beyond company
           </div>
+          <p className="max-w-xs text-xs text-muted-foreground/80">
+            Legal name: M. V. Beyond. Move-Tick is a subsidiary of M. V. Beyond.
+            <br />
+            Tax Number: 769-465-315
+          </p>
         </div>
 
         {FOOTER_COLUMNS.map((col) => (
