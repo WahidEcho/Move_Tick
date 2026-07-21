@@ -51,10 +51,10 @@ export async function PublicFooter() {
           <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
             <Image src="/brand/mb-logo-black.png" alt="" width={16} height={22} className="h-4 w-auto opacity-70 dark:hidden" />
             <Image src="/brand/mb-logo-white.png" alt="" width={16} height={22} className="hidden h-4 w-auto opacity-70 dark:block" />
-            A Move Beyond company
+            Move-Tick is a subsidiary of M. V. Beyond
           </div>
           <p className="max-w-xs text-xs text-muted-foreground/80">
-            Legal name: M. V. Beyond. Move-Tick is a subsidiary of M. V. Beyond.
+            Legal name: M. V. Beyond.
             <br />
             Tax Number: 769-465-315
           </p>
