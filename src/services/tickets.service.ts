@@ -18,6 +18,8 @@ export interface CreateTicketTypeData {
   max_per_user?: number;
   visibility?: 'public' | 'hidden' | 'invite_only';
   sort_order?: number;
+  benefits?: string[];
+  visual_label?: string | null;
 }
 
 export type TicketWithJoins = Ticket & {
@@ -57,6 +59,8 @@ export async function createTicketType(
       visibility: data.visibility ?? 'public',
       sort_order: sortOrder,
       is_active: true,
+      benefits: data.benefits ?? [],
+      visual_label: data.visual_label ?? null,
     })
     .select()
     .single();

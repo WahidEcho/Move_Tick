@@ -28,6 +28,8 @@ export function SettingsForm({ settings }: { settings: PlatformSettings }) {
     support_email: settings.support_email,
     admin_alert_email: settings.admin_alert_email,
     public_contact: settings.public_contact,
+    landing_hero_video_url: settings.landing_hero_video_url,
+    landing_hero_poster_url: settings.landing_hero_poster_url,
   });
 
   const handleSave = async () => {
@@ -44,6 +46,23 @@ export function SettingsForm({ settings }: { settings: PlatformSettings }) {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Landing hero media</CardTitle>
+          <p className="text-sm text-muted-foreground">Use a compressed WebM or MP4 reel. Leaving this blank keeps the animated aurora fallback.</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>Video URL</Label>
+            <Input value={form.landing_hero_video_url ?? ''} onChange={(e) => setForm((f) => ({ ...f, landing_hero_video_url: e.target.value || null }))} placeholder="https://…/move-tick-reel.webm" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Poster URL</Label>
+            <Input value={form.landing_hero_poster_url ?? ''} onChange={(e) => setForm((f) => ({ ...f, landing_hero_poster_url: e.target.value || null }))} placeholder="https://…/move-tick-reel-poster.webp" />
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Fees & commission</CardTitle>

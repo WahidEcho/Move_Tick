@@ -110,7 +110,10 @@ export interface Event {
   title: string;
   slug: string;
   description: string | null;
+  short_summary: string | null;
   cover_image_url: string | null;
+  promo_video_url: string | null;
+  promo_video_poster_url: string | null;
   start_date: string;
   end_date: string;
   location: string | null;
@@ -127,6 +130,12 @@ export interface Event {
   doors_open_time: string | null;
   maps_url: string | null;
   facilities: string[];
+  age_restriction: string | null;
+  accessibility_notes: string | null;
+  refund_policy: string | null;
+  dress_code: string | null;
+  is_featured: boolean;
+  featured_rank: number | null;
   created_at: string;
   updated_at: string;
   organization?: Organization;
@@ -164,8 +173,66 @@ export interface TicketType {
   visibility: TicketVisibility;
   sort_order: number;
   is_active: boolean;
+  benefits: string[];
+  visual_label: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface EventMedia {
+  id: string;
+  event_id: string;
+  media_type: 'image' | 'video';
+  url: string;
+  poster_url: string | null;
+  alt_text: string | null;
+  caption: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface EventHighlight {
+  id: string;
+  event_id: string;
+  icon_key: string | null;
+  title: string;
+  description: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface EventSpeaker {
+  id: string;
+  event_id: string;
+  name: string;
+  role: string | null;
+  biography: string | null;
+  image_url: string | null;
+  social_url: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface EventAgendaItem {
+  id: string;
+  event_id: string;
+  starts_at: string;
+  ends_at: string | null;
+  title: string;
+  description: string | null;
+  location: string | null;
+  speaker_id: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface EventFaq {
+  id: string;
+  event_id: string;
+  question: string;
+  answer: string;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface Ticket {
@@ -361,6 +428,8 @@ export interface PlatformSettings {
   support_email: string;
   admin_alert_email: string;
   public_contact: string | null;
+  landing_hero_video_url: string | null;
+  landing_hero_poster_url: string | null;
   created_at: string;
   updated_at: string;
 }

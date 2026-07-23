@@ -2,7 +2,13 @@ import { createServiceClient } from '@/lib/supabase-server';
 import { getExpiryThresholdISO, getEventExpiryBufferHours, maxExpiryThresholdISO } from '@/lib/event-visibility';
 import type {
   Event,
+  EventAgendaItem,
+  EventFaq,
+  EventHighlight,
+  EventMedia,
   EventSettings,
+  EventSpeaker,
+  TicketType,
   EventVisibility,
 } from '@/types/database.types';
 import type { PaginatedResult } from '@/types/domain.types';
@@ -10,13 +16,17 @@ import type { PaginatedResult } from '@/types/domain.types';
 export type EventWithDetails = Event & {
   event_settings: EventSettings | null;
   organization?: { id: string; name: string; slug: string; logo_url: string | null } | null;
+  ticket_types?: TicketType[];
 };
 
 export interface CreateEventData {
   title: string;
   slug: string;
   description?: string | null;
+  short_summary?: string | null;
   cover_image_url?: string | null;
+  promo_video_url?: string | null;
+  promo_video_poster_url?: string | null;
   start_date: string;
   end_date: string;
   location?: string | null;
@@ -29,6 +39,10 @@ export interface CreateEventData {
   doors_open_time?: string | null;
   maps_url?: string | null;
   facilities?: string[];
+  age_restriction?: string | null;
+  accessibility_notes?: string | null;
+  refund_policy?: string | null;
+  dress_code?: string | null;
 }
 
 export interface UpdateEventData {
@@ -37,7 +51,10 @@ export interface UpdateEventData {
   is_published?: boolean;
   is_cancelled?: boolean;
   description?: string | null;
+  short_summary?: string | null;
   cover_image_url?: string | null;
+  promo_video_url?: string | null;
+  promo_video_poster_url?: string | null;
   start_date?: string;
   end_date?: string;
   location?: string | null;
@@ -50,6 +67,10 @@ export interface UpdateEventData {
   doors_open_time?: string | null;
   maps_url?: string | null;
   facilities?: string[];
+  age_restriction?: string | null;
+  accessibility_notes?: string | null;
+  refund_policy?: string | null;
+  dress_code?: string | null;
 }
 
 export interface UpdateEventSettingsData {
@@ -101,6 +122,46 @@ export interface EventStats {
   capacity: number | null;
 }
 
+export interface EventStoryContent {
+  media: EventMedia[];
+  highlights: EventHighlight[];
+  agenda: EventAgendaItem[];
+  speakers: EventSpeaker[];
+  faqs: EventFaq[];
+}
+
+const EMPTY_EVENT_STORY: EventStoryContent = {
+  media: [],
+  highlights: [],
+  agenda: [],
+  speakers: [],
+  faqs: [],
+};
+
+/**
+ * Optional rich content. This deliberately degrades to empty collections so
+ * legacy databases and events render the cinematic shell before the migration
+ * is deployed or before an organizer has authored any story sections.
+ */
+export async function getEventStoryContent(eventId: string): Promise<EventStoryContent> {
+  const supabase = createServiceClient();
+  const [media, highlights, agenda, speakers, faqs] = await Promise.all([
+    supabase.from('event_media').select('*').eq('event_id', eventId).order('sort_order'),
+    supabase.from('event_highlights').select('*').eq('event_id', eventId).order('sort_order'),
+    supabase.from('event_agenda_items').select('*').eq('event_id', eventId).order('starts_at'),
+    supabase.from('event_speakers').select('*').eq('event_id', eventId).order('sort_order'),
+    supabase.from('event_faqs').select('*').eq('event_id', eventId).order('sort_order'),
+  ]);
+
+  return {
+    media: media.error ? EMPTY_EVENT_STORY.media : (media.data ?? []) as EventMedia[],
+    highlights: highlights.error ? EMPTY_EVENT_STORY.highlights : (highlights.data ?? []) as EventHighlight[],
+    agenda: agenda.error ? EMPTY_EVENT_STORY.agenda : (agenda.data ?? []) as EventAgendaItem[],
+    speakers: speakers.error ? EMPTY_EVENT_STORY.speakers : (speakers.data ?? []) as EventSpeaker[],
+    faqs: faqs.error ? EMPTY_EVENT_STORY.faqs : (faqs.data ?? []) as EventFaq[],
+  };
+}
+
 const EVENT_SETTINGS_DEFAULTS = {
   approval_required: false,
   enable_waitlist: false,
@@ -127,7 +188,10 @@ export async function createEvent(
       title: data.title,
       slug: data.slug,
       description: data.description ?? null,
+      short_summary: data.short_summary ?? null,
       cover_image_url: data.cover_image_url ?? null,
+      promo_video_url: data.promo_video_url ?? null,
+      promo_video_poster_url: data.promo_video_poster_url ?? null,
       start_date: data.start_date,
       end_date: data.end_date,
       location: data.location ?? null,
@@ -140,6 +204,10 @@ export async function createEvent(
       doors_open_time: data.doors_open_time ?? null,
       maps_url: data.maps_url ?? null,
       facilities: data.facilities ?? [],
+      age_restriction: data.age_restriction ?? null,
+      accessibility_notes: data.accessibility_notes ?? null,
+      refund_policy: data.refund_policy ?? null,
+      dress_code: data.dress_code ?? null,
       is_published: false,
       is_cancelled: false,
     })
@@ -220,7 +288,8 @@ export async function getEvents(
     .select(
       `
       *,
-      organization:organizations(id, name, slug, event_expiry_buffer_hours)
+      organization:organizations(id, name, slug, logo_url, event_expiry_buffer_hours),
+      ticket_types(id, name, price, capacity, sold_count, visibility, is_active, sort_order)
     `,
       { count: 'exact' }
     );
@@ -287,6 +356,31 @@ export async function getPublicEvents(
     visibility: 'public',
     excludeExpiredAndHidden: true,
   });
+}
+
+export interface PublicLandingStats {
+  upcomingEvents: number;
+  ticketsIssued: number;
+  organizers: number;
+  cities: number;
+}
+
+/** Real, public-safe platform signals used on the landing page. */
+export async function getPublicLandingStats(): Promise<PublicLandingStats> {
+  const supabase = createServiceClient();
+  const now = new Date().toISOString();
+  const [events, tickets, organizers, cityRows] = await Promise.all([
+    supabase.from('events').select('id', { count: 'exact', head: true }).eq('is_published', true).eq('is_cancelled', false).eq('is_hidden', false).is('archived_at', null).gte('end_date', now),
+    supabase.from('tickets').select('id', { count: 'exact', head: true }).eq('is_active', true),
+    supabase.from('organizations').select('id', { count: 'exact', head: true }).eq('is_active', true),
+    supabase.from('events').select('city').eq('is_published', true).eq('is_cancelled', false).eq('is_hidden', false).is('archived_at', null).gte('end_date', now).not('city', 'is', null),
+  ]);
+  return {
+    upcomingEvents: events.count ?? 0,
+    ticketsIssued: tickets.count ?? 0,
+    organizers: organizers.count ?? 0,
+    cities: new Set((cityRows.data ?? []).map((row) => row.city?.trim().toLowerCase()).filter(Boolean)).size,
+  };
 }
 
 export type AdminEventStatus = 'all' | 'draft' | 'published' | 'hidden' | 'cancelled' | 'expired' | 'archived';

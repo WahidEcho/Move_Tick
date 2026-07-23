@@ -35,6 +35,8 @@ export async function updatePlatformSettings(
       | 'support_email'
       | 'admin_alert_email'
       | 'public_contact'
+      | 'landing_hero_video_url'
+      | 'landing_hero_poster_url'
     >
   >
 ): Promise<PlatformSettings> {

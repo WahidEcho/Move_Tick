@@ -8,13 +8,10 @@ export default async function NotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Notifications
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Updates about your applications, organizations, and events
-        </p>
+      <div className="cinematic-panel p-6 sm:p-8">
+        <p className="cinematic-kicker">Stay in the moment</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Notifications</h1>
+        <p className="mt-2 text-muted-foreground">Ticket, payment, invitation, and event updates—together and actionable.</p>
       </div>
 
       <NotificationsList initialNotifications={notifications} />

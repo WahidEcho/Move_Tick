@@ -52,6 +52,8 @@ export function TicketTypeForm({
       sales_end: '',
       max_per_user: 1,
       visibility: 'public',
+      benefits: [],
+      visual_label: '',
     },
   });
 
@@ -65,6 +67,8 @@ export function TicketTypeForm({
       sales_end: ticketType?.sales_end?.slice(0, 16) ?? '',
       max_per_user: ticketType?.max_per_user ?? 1,
       visibility: ticketType?.visibility ?? 'public',
+      benefits: ticketType?.benefits ?? [],
+      visual_label: ticketType?.visual_label ?? '',
     });
   };
 
@@ -84,6 +88,8 @@ export function TicketTypeForm({
       sales_end: data.sales_end || null,
       max_per_user: data.max_per_user,
       visibility: data.visibility,
+      benefits: data.benefits ?? [],
+      visual_label: data.visual_label || null,
     };
 
     const result = isEdit
@@ -122,6 +128,17 @@ export function TicketTypeForm({
               {...form.register('description')}
               placeholder="Optional description"
               rows={2}
+            />
+          </FormField>
+          <FormField label="Visual label" name="visual_label" error={form.formState.errors.visual_label?.message} description="Optional short badge, for example Early Bird or Best Value.">
+            <Input {...form.register('visual_label')} placeholder="Best Value" />
+          </FormField>
+          <FormField label="Ticket benefits" name="benefits" error={form.formState.errors.benefits?.message as string | undefined} description="One benefit per line. These appear as checkmarks on the public ticket card.">
+            <Textarea
+              value={(form.watch('benefits') ?? []).join('\n')}
+              onChange={(event) => form.setValue('benefits', event.target.value.split('\n').map((line) => line.trim()).filter(Boolean), { shouldDirty: true })}
+              placeholder={'Access to all stages\nFast-track entrance\nWelcome drink'}
+              rows={4}
             />
           </FormField>
           <FormField

@@ -12,7 +12,8 @@ import { profileSchema, type ProfileInput } from '@/lib/validations';
 import { AvatarUpload } from '@/components/forms/avatar-upload';
 import { toast } from 'sonner';
 import type { Profile } from '@/types/database.types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Mail, Phone, ShieldCheck, Headphones, ArrowUpRight } from 'lucide-react';
+import Link from 'next/link';
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -140,18 +141,31 @@ export default function ProfilePage() {
     );
   }
 
+  const completedFields = [profile.full_name, profile.phone, profile.avatar_url, profile.email].filter(Boolean).length;
+  const completion = Math.round((completedFields / 4) * 100);
+
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Profile settings
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Update your profile information
-        </p>
+    <div className="mx-auto max-w-3xl space-y-8">
+      <div className="cinematic-panel relative overflow-hidden p-6 sm:p-8">
+        <div className="absolute -right-20 -top-20 size-64 rounded-full bg-primary/20 blur-3xl" />
+        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center">
+          <div className="grid size-20 shrink-0 place-items-center rounded-3xl border border-white/10 bg-gradient-to-br from-primary to-brand-green text-2xl font-bold text-black shadow-xl">
+            {(profile.full_name || profile.email || 'M').slice(0, 1).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="cinematic-kicker">Your identity</p>
+            <h1 className="mt-1 truncate text-3xl font-semibold tracking-tight">{profile.full_name || 'Complete your profile'}</h1>
+            <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground"><Mail className="size-4" />{profile.email}</p>
+            {profile.phone && <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground"><Phone className="size-4" />{profile.phone}</p>}
+          </div>
+          <div className="w-full rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:w-44">
+            <div className="flex items-center justify-between text-xs"><span className="text-muted-foreground">Profile complete</span><strong>{completion}%</strong></div>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-primary to-brand-green transition-all" style={{ width: `${completion}%` }} /></div>
+          </div>
+        </div>
       </div>
 
-      <Card>
+      <Card className="border-border/70 bg-card/70">
         <CardHeader>
           <CardTitle>Profile information</CardTitle>
           <p className="text-sm text-muted-foreground">
@@ -215,7 +229,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-border/70 bg-card/70">
         <CardHeader>
           <CardTitle>Change password</CardTitle>
           <p className="text-sm text-muted-foreground">
@@ -259,6 +273,11 @@ export default function ProfilePage() {
           </form>
         </CardContent>
       </Card>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="border-border/70 bg-card/70"><CardContent className="flex items-center gap-4 py-5"><div className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary"><ShieldCheck className="size-5" /></div><div className="flex-1"><p className="font-semibold">Privacy & security</p><p className="text-sm text-muted-foreground">Your account and ticket data</p></div></CardContent></Card>
+        <Link href="/contact"><Card className="border-border/70 bg-card/70 transition-colors hover:border-primary/30"><CardContent className="flex items-center gap-4 py-5"><div className="grid size-11 place-items-center rounded-xl bg-brand-green/10 text-brand-green"><Headphones className="size-5" /></div><div className="flex-1"><p className="font-semibold">Support</p><p className="text-sm text-muted-foreground">We&apos;re here when you need us</p></div><ArrowUpRight className="size-4 text-muted-foreground" /></CardContent></Card></Link>
+      </div>
     </div>
   );
 }

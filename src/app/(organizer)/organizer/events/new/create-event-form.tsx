@@ -44,7 +44,10 @@ export function CreateEventForm({ orgId }: { orgId: string }) {
       title: '',
       slug: '',
       description: '',
+      short_summary: '',
       cover_image_url: '',
+      promo_video_url: '',
+      promo_video_poster_url: '',
       start_date: '',
       end_date: '',
       location: '',
@@ -57,6 +60,10 @@ export function CreateEventForm({ orgId }: { orgId: string }) {
       doors_open_time: '',
       maps_url: '',
       facilities: [],
+      age_restriction: '',
+      accessibility_notes: '',
+      refund_policy: '',
+      dress_code: '',
     },
   });
 
@@ -125,6 +132,15 @@ export function CreateEventForm({ orgId }: { orgId: string }) {
               required
             >
               <Input {...register('slug')} placeholder="event-slug" />
+            </FormField>
+
+            <FormField
+              label="Short summary"
+              name="short_summary"
+              error={errors.short_summary?.message}
+              description="A compelling one-line introduction used in the event masthead (maximum 220 characters)."
+            >
+              <Textarea {...register('short_summary')} placeholder="What makes this experience unmissable?" rows={2} maxLength={220} />
             </FormField>
 
             <FormField
@@ -270,9 +286,10 @@ export function CreateEventForm({ orgId }: { orgId: string }) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Cover Image</CardTitle>
+            <CardTitle>Event media</CardTitle>
+            <p className="text-sm text-muted-foreground">Your cover anchors every event card. An optional trailer appears with an explicit play control.</p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <FormField
               label="Cover Image"
               name="cover_image_url"
@@ -284,6 +301,22 @@ export function CreateEventForm({ orgId }: { orgId: string }) {
                 onChange={(url) => setValue('cover_image_url', url, { shouldDirty: true })}
               />
             </FormField>
+            <FormField label="Trailer URL" name="promo_video_url" error={errors.promo_video_url?.message} description="Direct MP4/WebM URL. Video never autoplays on event pages.">
+              <Input {...register('promo_video_url')} placeholder="https://…/trailer.mp4" />
+            </FormField>
+            <FormField label="Trailer poster URL" name="promo_video_poster_url" error={errors.promo_video_poster_url?.message}>
+              <Input {...register('promo_video_poster_url')} placeholder="https://…/poster.webp" />
+            </FormField>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Guest information</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <FormField label="Age restriction" name="age_restriction" error={errors.age_restriction?.message}><Input {...register('age_restriction')} placeholder="18+ · valid ID required" /></FormField>
+            <FormField label="Dress code" name="dress_code" error={errors.dress_code?.message}><Input {...register('dress_code')} placeholder="Smart casual" /></FormField>
+            <FormField label="Accessibility notes" name="accessibility_notes" error={errors.accessibility_notes?.message}><Textarea {...register('accessibility_notes')} rows={3} placeholder="Step-free access, accessible parking…" /></FormField>
+            <FormField label="Refund policy" name="refund_policy" error={errors.refund_policy?.message}><Textarea {...register('refund_policy')} rows={3} placeholder="Refund and transfer terms…" /></FormField>
           </CardContent>
         </Card>
 

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist_Mono, Inter, Orbitron, Rajdhani } from 'next/font/google';
 import { Providers } from '@/lib/providers';
+import { getAppUrl } from '@/lib/app-url';
 import './globals.css';
 
 // Body font
@@ -15,8 +16,25 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getAppUrl()),
   title: 'Move-Tick — Discover. Connect. Experience.',
   description: 'Move-Tick by Move Beyond — the modern event platform. Discover events, buy tickets in seconds, and run world-class check-in.',
+  icons: {
+    icon: [{ url: '/brand/Icon-512.png', type: 'image/png' }],
+    shortcut: '/brand/Icon-512.png',
+    apple: '/brand/Icon-512.png',
+  },
+  openGraph: {
+    title: 'Move-Tick — Discover. Connect. Experience.',
+    description: 'Discover events, get your ticket in seconds, and arrive ready.',
+    images: [{ url: '/og.png', width: 1672, height: 941, alt: 'Move-Tick event platform' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Move-Tick — Discover. Connect. Experience.',
+    description: 'Discover events, get your ticket in seconds, and arrive ready.',
+    images: ['/og.png'],
+  },
 };
 
 export default function RootLayout({

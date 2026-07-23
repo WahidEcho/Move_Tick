@@ -58,7 +58,10 @@ export const eventSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
   slug: z.string().min(3, 'Slug must be at least 3 characters').regex(/^[a-z0-9-]+$/, 'Slug must be lowercase with hyphens only'),
   description: z.string().min(10, 'Description must be at least 10 characters'),
+  short_summary: z.string().max(220, 'Summary must be 220 characters or less').optional(),
   cover_image_url: z.string().url().optional().or(z.literal('')),
+  promo_video_url: z.string().url().optional().or(z.literal('')),
+  promo_video_poster_url: z.string().url().optional().or(z.literal('')),
   start_date: z.string().min(1, 'Start date is required'),
   end_date: z.string().min(1, 'End date is required'),
   location: z.string().optional(),
@@ -71,6 +74,10 @@ export const eventSchema = z.object({
   doors_open_time: z.string().optional(),
   maps_url: z.string().url().optional().or(z.literal('')),
   facilities: z.array(z.string()).optional(),
+  age_restriction: z.string().max(80).optional(),
+  accessibility_notes: z.string().max(500).optional(),
+  refund_policy: z.string().max(1000).optional(),
+  dress_code: z.string().max(120).optional(),
 });
 
 export const eventSettingsSchema = z.object({
@@ -95,6 +102,8 @@ export const ticketTypeSchema = z.object({
   sales_end: z.string().optional(),
   max_per_user: z.number().min(1).max(10),
   visibility: z.enum(['public', 'hidden', 'invite_only']),
+  benefits: z.array(z.string().max(160)).optional(),
+  visual_label: z.string().max(40).optional(),
 });
 
 export const spaceSchema = z.object({

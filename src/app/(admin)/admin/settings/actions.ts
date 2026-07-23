@@ -21,6 +21,8 @@ export type EditablePlatformSettings = Pick<
   | 'support_email'
   | 'admin_alert_email'
   | 'public_contact'
+  | 'landing_hero_video_url'
+  | 'landing_hero_poster_url'
 >;
 
 export async function updatePlatformSettingsAction(data: EditablePlatformSettings) {

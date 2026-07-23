@@ -9,7 +9,7 @@ import { ThemeProvider } from 'next-themes';
 // installed but never used, so its provider was removed to slim the bundle.
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <ThemeProvider attribute="class" defaultTheme="dark" themes={['light', 'dark']} enableSystem={false} disableTransitionOnChange>
       <TooltipProvider delay={300}>
         {children}
         <Toaster position="bottom-right" />

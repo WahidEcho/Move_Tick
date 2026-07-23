@@ -151,7 +151,7 @@ async function deliverInvitation(invitationId: string): Promise<void> {
 
 export type EventInvitationWithTicketType = EventInvitation & {
   ticket_type?: { id: string; name: string; price: number } | null;
-  event?: { id: string; title: string; slug: string; start_date: string; end_date: string; venue: string | null; city: string | null } | null;
+  event?: { id: string; title: string; slug: string; start_date: string; end_date: string; venue: string | null; city: string | null; cover_image_url: string | null; category: string | null } | null;
 };
 
 export interface CreateInvitationData {
@@ -474,7 +474,7 @@ export async function getUserInvitations(
 
   const { data, error } = await supabase
     .from('event_invitations')
-    .select('*, ticket_type:ticket_types(id, name, price), event:events(id, title, slug, start_date, end_date, venue, city)')
+    .select('*, ticket_type:ticket_types(id, name, price), event:events(id, title, slug, start_date, end_date, venue, city, cover_image_url, category)')
     .eq('invitee_email', profile.email)
     .order('created_at', { ascending: false });
 

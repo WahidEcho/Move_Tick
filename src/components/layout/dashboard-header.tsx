@@ -13,9 +13,8 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import { Menu, LayoutDashboard, LogOut, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types/ui.types';
-import type { Profile } from '@/types/database.types';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 interface DashboardHeaderProps {
   title: string;
@@ -95,6 +94,7 @@ export function DashboardHeader({
 
         <div className="flex shrink-0 items-center gap-2">
           {actions}
+          <ThemeToggle />
           <NotificationBell userId={user?.id} />
           <DropdownMenu>
             <DropdownMenuTrigger

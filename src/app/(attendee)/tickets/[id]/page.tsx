@@ -72,6 +72,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
   }
 
   return (
+    <div className="-m-4 min-h-[calc(100vh-3.5rem)] bg-background p-4 text-foreground md:-m-6 md:p-8 lg:-m-8 lg:p-10">
     <div className="mx-auto max-w-2xl space-y-6">
       <Link
         href="/tickets"
@@ -99,7 +100,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
         {/* Wallet-style ticket card */}
         {ticket.qr_code && (
           <div
-            className="relative mx-auto w-full max-w-sm overflow-hidden rounded-[28px] px-6 pb-8 pt-9 text-white shadow-xl"
+            className="ticket-cutout relative mx-auto w-full max-w-sm overflow-hidden rounded-[28px] border border-white/15 px-6 pb-8 pt-9 text-white shadow-2xl shadow-brand-purple/20"
             style={{
               background: 'linear-gradient(180deg, #120E28 0%, #251A66 55%, #4C33D6 100%)',
               WebkitMask: 'radial-gradient(circle 16px at 50% 0, transparent 97%, #000 100%)',
@@ -153,7 +154,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
               </div>
 
               <div className="flex justify-center pt-2">
-                <div className="rounded-2xl bg-white p-4 text-center">
+                <div className={`rounded-2xl bg-white p-4 text-center ${isUsable ? 'qr-pulse' : ''}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={ticket.qr_code} alt="Ticket QR code" className="size-44 object-contain" />
                   <p className="mt-2 text-xs font-semibold text-foreground">{ticketType?.name ?? 'Ticket'}</p>
@@ -189,7 +190,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
         )}
 
         {/* Event details */}
-        <Card>
+        <Card className="border border-border bg-card dark:border-white/10 dark:bg-white/[.04]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Calendar className="size-4" />
@@ -225,7 +226,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
 
         {/* Ticket type info */}
         {ticketType && (
-          <Card>
+          <Card className="border border-border bg-card dark:border-white/10 dark:bg-white/[.04]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Ticket className="size-4" />
@@ -245,7 +246,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
 
         {/* Movement history */}
         {movements.length > 0 && (
-          <Card>
+          <Card className="border border-border bg-card dark:border-white/10 dark:bg-white/[.04]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Clock className="size-4" />
@@ -277,7 +278,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
 
         {/* Redeem balances */}
         {redeemBalances.length > 0 && (
-          <Card>
+          <Card className="border border-border bg-card dark:border-white/10 dark:bg-white/[.04]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Gift className="size-4" />
@@ -323,6 +324,7 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
           </Link>
         )}
       </div>
+    </div>
     </div>
   );
 }

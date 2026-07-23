@@ -33,7 +33,10 @@ export async function createEventAction(
       title: data.title,
       slug: data.slug,
       description: data.description,
+      short_summary: data.short_summary || null,
       cover_image_url: data.cover_image_url || null,
+      promo_video_url: data.promo_video_url || null,
+      promo_video_poster_url: data.promo_video_poster_url || null,
       start_date: data.start_date,
       end_date: data.end_date,
       location: data.location ?? null,
@@ -48,6 +51,10 @@ export async function createEventAction(
       doors_open_time: data.doors_open_time || null,
       maps_url: data.maps_url || null,
       facilities: data.facilities ?? [],
+      age_restriction: data.age_restriction || null,
+      accessibility_notes: data.accessibility_notes || null,
+      refund_policy: data.refund_policy || null,
+      dress_code: data.dress_code || null,
     });
     revalidatePath('/organizer/overview');
     revalidatePath('/organizer/events');

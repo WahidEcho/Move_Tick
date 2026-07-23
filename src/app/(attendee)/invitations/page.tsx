@@ -3,12 +3,12 @@ import { requireAuth } from '@/lib/auth';
 import { getUserInvitations } from '@/services/invitations.service';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { EmptyState } from '@/components/layout/empty-state';
 import { InvitationActions } from './invitation-actions';
 import { Mail, Calendar, MapPin, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
+import Image from 'next/image';
 import type { InvitationStatus } from '@/types/database.types';
 import type { EventInvitationWithTicketType } from '@/services/invitations.service';
 
@@ -36,17 +36,23 @@ function InvitationCard({
   inv: EventInvitationWithTicketType;
   showActions: boolean;
 }) {
-  const event = inv.event as { slug?: string; title?: string; start_date?: string; venue?: string | null; city?: string | null } | null;
+  const event = inv.event;
   const eventSlug = event?.slug;
 
   return (
-    <Card>
+    <Card className="group overflow-hidden border-border/70 bg-card/70 shadow-lg shadow-primary/5 transition-transform hover:-translate-y-0.5">
+      <div className="relative h-40 overflow-hidden bg-gradient-to-br from-primary/40 via-background to-brand-green/20">
+        {event?.cover_image_url && <Image src={event.cover_image_url} alt="" fill unoptimized className="object-cover transition-transform duration-700 group-hover:scale-105" />}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+        <div className="absolute inset-x-5 bottom-4 text-white">
+          <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-brand-green">{event?.category ?? 'Private invitation'}</p>
+          <h3 className="mt-1 text-xl font-semibold">{event?.title ?? 'Event'}</h3>
+        </div>
+      </div>
       <CardHeader className="pb-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <CardTitle className="text-base">
-              {event?.title ?? 'Event'}
-            </CardTitle>
+            <CardTitle className="text-base">You&apos;re invited</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
               Invited as {inv.invitee_name || inv.invitee_email}
             </p>
@@ -121,13 +127,10 @@ export default async function InvitationsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Invitations
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Manage your event invitations
-        </p>
+      <div className="cinematic-panel overflow-hidden p-6 sm:p-8">
+        <p className="cinematic-kicker">Your guest list</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Invitations</h1>
+        <p className="mt-2 max-w-xl text-muted-foreground">Beautiful experiences are waiting for your response.</p>
       </div>
 
       <Tabs defaultValue="all" className="w-full">
@@ -147,7 +150,7 @@ export default async function InvitationsPage() {
               action={{ label: 'Explore Events', href: '/events' }}
             />
           ) : (
-            <div className="space-y-4">
+            <div className="grid gap-5 lg:grid-cols-2">
               {invitations.map((inv) => (
                 <InvitationCard
                   key={inv.id}
@@ -167,7 +170,7 @@ export default async function InvitationsPage() {
               description="You're all caught up!"
             />
           ) : (
-            <div className="space-y-4">
+            <div className="grid gap-5 lg:grid-cols-2">
               {pending.map((inv) => (
                 <InvitationCard key={inv.id} inv={inv} showActions={true} />
               ))}
@@ -183,7 +186,7 @@ export default async function InvitationsPage() {
               description="Invitations you accept will appear here."
             />
           ) : (
-            <div className="space-y-4">
+            <div className="grid gap-5 lg:grid-cols-2">
               {accepted.map((inv) => (
                 <InvitationCard key={inv.id} inv={inv} showActions={false} />
               ))}
@@ -199,7 +202,7 @@ export default async function InvitationsPage() {
               description="Invitations you decline will appear here."
             />
           ) : (
-            <div className="space-y-4">
+            <div className="grid gap-5 lg:grid-cols-2">
               {declined.map((inv) => (
                 <InvitationCard key={inv.id} inv={inv} showActions={false} />
               ))}

@@ -2,13 +2,13 @@ import Link from 'next/link';
 import { getPublicEvents, getConfirmedCountsByEvent } from '@/services/events.service';
 import { EVENT_CATEGORIES } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
-import { Calendar, MapPin, Search } from 'lucide-react';
+import { Calendar, CalendarDays, MapPin, Search, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EventCard } from './event-card';
 import { AnimatedGrid } from './animated-grid';
 
 interface EventsPageProps {
-  searchParams: Promise<{ search?: string; category?: string; city?: string; page?: string }>;
+  searchParams: Promise<{ search?: string; category?: string; city?: string; page?: string; quick?: string }>;
 }
 
 /** Build an /events URL preserving the other active filters. */
@@ -27,6 +27,7 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
   const category = params.category ?? '';
   const city = params.city ?? '';
   const page = parseInt(params.page ?? '1', 10);
+  const quick = params.quick ?? '';
 
   const { data: events, total, total_pages } = await getPublicEvents({
     search: search || undefined,
@@ -37,20 +38,36 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
   });
 
   // One batched query for all "spots left" badges (was a per-card query).
-  const confirmedCounts = await getConfirmedCountsByEvent(events.map((e) => e.id));
+  const now = new Date();
+  const endOfWeekend = new Date(now);
+  endOfWeekend.setDate(now.getDate() + (now.getDay() === 0 ? 0 : 7 - now.getDay()));
+  endOfWeekend.setHours(23, 59, 59, 999);
+  const visibleEvents = events.filter((event) => {
+    if (!quick) return true;
+    const start = new Date(event.start_date);
+    if (quick === 'today') return start.toDateString() === now.toDateString();
+    if (quick === 'this weekend') return start >= now && start <= endOfWeekend;
+    if (quick === 'free events') return (event.ticket_types ?? []).some((ticket) => Number(ticket.price) === 0);
+    if (quick === 'sports') return event.category?.toLowerCase() === 'sports';
+    if (quick === 'music') return ['concert', 'festival'].includes(event.category?.toLowerCase() ?? '');
+    return true;
+  });
+  const confirmedCounts = await getConfirmedCountsByEvent(visibleEvents.map((e) => e.id));
+  const featuredId = visibleEvents.find((event) => event.is_featured)?.id ?? visibleEvents[0]?.id;
 
   return (
-    <div className="overflow-hidden">
+    <div className="cinematic-page min-h-screen overflow-hidden">
       {/* ── Cinematic header ─────────────────────────────────────── */}
-      <section className="relative isolate px-4 pt-16 pb-10 sm:pt-20">
+      <section className="cinematic-noise relative isolate px-4 pb-12 pt-20 sm:pt-24">
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
           <div className="mt-aurora absolute -top-40 left-1/4 size-[42rem] rounded-full bg-brand-purple/20 blur-[130px]" />
           <div className="mt-aurora-slow absolute -top-24 right-1/5 size-[32rem] rounded-full bg-brand-green/12 blur-[130px]" />
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
         </div>
 
-        <div className="mx-auto max-w-3xl text-center">
-          <h1 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-brand-green"><Sparkles className="size-4" /> Curated in Cairo</div>
+          <h1 className="max-w-4xl font-display text-4xl font-extrabold tracking-tight sm:text-6xl">
             Find your next <span className="mt-gradient-text">experience</span>
           </h1>
           <p className="mt-3 text-lg text-muted-foreground">
@@ -60,9 +77,9 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
           </p>
 
           {/* Big search bar (lu.ma style) */}
-          <form method="get" action="/events" className="mx-auto mt-8 max-w-2xl">
+          <form method="get" action="/events" className="sticky top-16 z-30 mt-8 max-w-4xl">
             {category && <input type="hidden" name="category" value={category} />}
-            <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-2 shadow-[0_8px_40px_-12px_rgba(91,59,232,0.25)] backdrop-blur transition-colors focus-within:border-brand-purple/50 sm:flex-row sm:items-center">
+            <div className="cinematic-panel flex flex-col gap-2 rounded-2xl p-2 shadow-[0_8px_40px_-12px_rgba(91,59,232,0.25)] transition-colors focus-within:border-brand-purple/50 sm:flex-row sm:items-center">
               <div className="flex flex-1 items-center gap-2 px-3">
                 <Search className="size-4 shrink-0 text-muted-foreground" />
                 <input
@@ -91,7 +108,24 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
         </div>
 
         {/* Category pills */}
-        <div className="mx-auto mt-8 max-w-5xl">
+        <div className="mx-auto mt-8 max-w-6xl">
+          <div className="scrollbar-none -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1">
+            {[
+              ['today', 'Today'], ['this weekend', 'This weekend'], ['free events', 'Free'],
+              ['sports', 'Sports'], ['music', 'Music'],
+            ].map(([value, label]) => (
+              <Link
+                key={value}
+                href={`/events?${new URLSearchParams({ ...(search && { search }), ...(city && { city }), quick: quick === value ? '' : value }).toString()}`}
+                className={cn('flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition-all', quick === value ? 'border-brand-purple bg-brand-purple text-white' : 'border-white/10 bg-white/[0.03] text-white/70 hover:border-white/25 hover:text-white')}
+              >
+                <CalendarDays className="size-3.5" /> {label}
+              </Link>
+            ))}
+            <button type="button" className="ml-auto flex shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm font-semibold text-white/70">
+              <SlidersHorizontal className="size-3.5" /> More filters
+            </button>
+          </div>
           <div className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:flex-wrap sm:justify-center sm:overflow-visible">
             <Link
               href={filterHref({ search, city })}
@@ -124,7 +158,7 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
 
       {/* ── Results ──────────────────────────────────────────────── */}
       <section className="container mx-auto max-w-6xl px-4 pb-20">
-        {events.length === 0 ? (
+        {visibleEvents.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/20 py-20">
             <Calendar className="size-12 text-muted-foreground/50" />
             <h2 className="mt-4 text-lg font-semibold text-foreground">
@@ -144,11 +178,12 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
         ) : (
           <>
             <AnimatedGrid className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {events.map((event) => (
+              {visibleEvents.map((event) => (
                 <EventCard
                   key={event.id}
                   event={event}
                   confirmedCount={confirmedCounts[event.id] ?? 0}
+                  featured={event.id === featuredId && visibleEvents.length > 2}
                 />
               ))}
             </AnimatedGrid>

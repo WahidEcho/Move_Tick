@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAuth, getOrgRole, getEventStaffRole } from '@/lib/auth';
-import { getEvent } from '@/services/events.service';
+import { getEvent, getEventStoryContent } from '@/services/events.service';
 
 export async function GET(
   _request: Request,
@@ -23,5 +23,6 @@ export async function GET(
     return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   }
 
-  return NextResponse.json(event);
+  const story = await getEventStoryContent(id);
+  return NextResponse.json({ ...event, story });
 }

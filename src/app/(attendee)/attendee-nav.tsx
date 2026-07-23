@@ -19,7 +19,7 @@ export function AttendeeNav() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden w-56 shrink-0 border-r border-border bg-muted/30 lg:block">
+      <aside className="hidden w-60 shrink-0 border-r border-border/60 bg-muted/20 lg:block">
         <nav className="sticky top-14 flex flex-col gap-1 p-4">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -44,8 +44,8 @@ export function AttendeeNav() {
         </nav>
       </aside>
 
-      {/* Mobile top tabs */}
-      <div className="flex w-full gap-1 overflow-x-auto border-b border-border bg-muted/30 px-4 py-2 lg:hidden">
+      {/* Mobile app-style bottom navigation */}
+      <div className="fixed inset-x-0 bottom-0 z-50 grid grid-cols-5 border-t border-border bg-background/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 text-foreground shadow-[0_-12px_40px_-24px_rgba(0,0,0,.28)] backdrop-blur-xl lg:hidden">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
@@ -55,14 +55,14 @@ export function AttendeeNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex shrink-0 items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                'flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] font-semibold transition-colors',
                 isActive
-                  ? 'bg-background text-primary shadow-sm'
+                  ? 'bg-brand-purple/15 text-brand-purple dark:text-[#b7a8ff]'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <Icon className="size-4" />
-              {item.label}
+              <Icon className="size-5" />
+              <span className="truncate">{item.label.replace('My ', '')}</span>
             </Link>
           );
         })}

@@ -11,11 +11,11 @@ export default async function AttendeeLayout({
   await requireAuth();
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <PublicHeader />
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <PublicHeader allowThemeToggle />
       <div className="flex flex-1 flex-col lg:flex-row">
         <AttendeeNav />
-        <main className="flex-1 px-4 py-6 md:px-6 lg:px-8">
+        <main className="flex-1 px-4 py-6 pb-24 md:px-6 lg:px-8 lg:pb-8">
           {children}
         </main>
       </div>

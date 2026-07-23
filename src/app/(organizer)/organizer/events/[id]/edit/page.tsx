@@ -32,6 +32,10 @@ import {
 } from './actions';
 import { ArrowLeft } from 'lucide-react';
 import type { EventWithDetails } from '@/services/events.service';
+import type { EventStoryContent } from '@/services/events.service';
+import { EventStoryEditor } from './event-story-editor';
+
+const EMPTY_STORY: EventStoryContent = { media: [], highlights: [], agenda: [], speakers: [], faqs: [] };
 
 const VISIBILITY_OPTIONS = [
   { label: 'Public', value: 'public' },
@@ -51,6 +55,7 @@ export default function EditEventPage() {
   const params = useParams<{ id: string }>();
   const eventId = params.id;
   const [event, setEvent] = useState<EventWithDetails | null>(null);
+  const [story, setStory] = useState<EventStoryContent>(EMPTY_STORY);
   const [loading, setLoading] = useState(true);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -60,7 +65,10 @@ export default function EditEventPage() {
       title: '',
       slug: '',
       description: '',
+      short_summary: '',
       cover_image_url: '',
+      promo_video_url: '',
+      promo_video_poster_url: '',
       start_date: '',
       end_date: '',
       location: '',
@@ -73,6 +81,10 @@ export default function EditEventPage() {
       doors_open_time: '',
       maps_url: '',
       facilities: [],
+      age_restriction: '',
+      accessibility_notes: '',
+      refund_policy: '',
+      dress_code: '',
     },
   });
 
@@ -112,13 +124,17 @@ export default function EditEventPage() {
       }
       const data = await res.json();
       setEvent(data);
+      setStory(data.story ?? EMPTY_STORY);
       const ev = data;
       const settings = ev.event_settings ?? {};
       eventForm.reset({
         title: ev.title ?? '',
         slug: ev.slug ?? '',
         description: ev.description ?? '',
+        short_summary: ev.short_summary ?? '',
         cover_image_url: ev.cover_image_url ?? '',
+        promo_video_url: ev.promo_video_url ?? '',
+        promo_video_poster_url: ev.promo_video_poster_url ?? '',
         start_date: ev.start_date ? toDatetimeLocal(ev.start_date) : '',
         end_date: ev.end_date ? toDatetimeLocal(ev.end_date) : '',
         location: ev.location ?? '',
@@ -131,6 +147,10 @@ export default function EditEventPage() {
         doors_open_time: ev.doors_open_time ? toDatetimeLocal(ev.doors_open_time) : '',
         maps_url: ev.maps_url ?? '',
         facilities: ev.facilities ?? [],
+        age_restriction: ev.age_restriction ?? '',
+        accessibility_notes: ev.accessibility_notes ?? '',
+        refund_policy: ev.refund_policy ?? '',
+        dress_code: ev.dress_code ?? '',
       });
       settingsForm.reset({
         approval_required: settings.approval_required ?? false,
@@ -245,6 +265,14 @@ export default function EditEventPage() {
                   required
                 >
                   <Input {...eventForm.register('slug')} placeholder="event-slug" />
+                </FormField>
+                <FormField
+                  label="Short summary"
+                  name="short_summary"
+                  error={eventForm.formState.errors.short_summary?.message}
+                  description="The one-line masthead introduction (maximum 220 characters)."
+                >
+                  <Textarea {...eventForm.register('short_summary')} rows={2} maxLength={220} placeholder="What makes this experience unmissable?" />
                 </FormField>
                 <FormField
                   label="Description"
@@ -375,9 +403,10 @@ export default function EditEventPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Cover Image</CardTitle>
+                <CardTitle>Event media</CardTitle>
+                <p className="text-sm text-muted-foreground">Cover artwork appears across discovery. Trailers are always user-initiated.</p>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <FormField
                   label="Cover Image"
                   name="cover_image_url"
@@ -391,6 +420,22 @@ export default function EditEventPage() {
                     }
                   />
                 </FormField>
+                <FormField label="Trailer URL" name="promo_video_url" error={eventForm.formState.errors.promo_video_url?.message}>
+                  <Input {...eventForm.register('promo_video_url')} placeholder="https://…/trailer.mp4" />
+                </FormField>
+                <FormField label="Trailer poster URL" name="promo_video_poster_url" error={eventForm.formState.errors.promo_video_poster_url?.message}>
+                  <Input {...eventForm.register('promo_video_poster_url')} placeholder="https://…/poster.webp" />
+                </FormField>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>Guest information</CardTitle></CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-2">
+                <FormField label="Age restriction" name="age_restriction" error={eventForm.formState.errors.age_restriction?.message}><Input {...eventForm.register('age_restriction')} placeholder="18+ · valid ID required" /></FormField>
+                <FormField label="Dress code" name="dress_code" error={eventForm.formState.errors.dress_code?.message}><Input {...eventForm.register('dress_code')} placeholder="Smart casual" /></FormField>
+                <FormField label="Accessibility notes" name="accessibility_notes" error={eventForm.formState.errors.accessibility_notes?.message}><Textarea {...eventForm.register('accessibility_notes')} rows={3} /></FormField>
+                <FormField label="Refund policy" name="refund_policy" error={eventForm.formState.errors.refund_policy?.message}><Textarea {...eventForm.register('refund_policy')} rows={3} /></FormField>
               </CardContent>
             </Card>
 
@@ -464,6 +509,7 @@ export default function EditEventPage() {
       </div>
 
       {submitError && <p className="text-sm text-destructive">{submitError}</p>}
+      <EventStoryEditor eventId={eventId} slug={event.slug} initial={story} />
     </div>
   );
 }

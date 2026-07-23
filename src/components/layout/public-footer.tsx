@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { getPlatformSettings } from '@/services/platform-settings.service';
+import { MoveBeyondMark, MoveTickBrand } from '@/components/brand/brand-marks';
 
 const FOOTER_COLUMNS: { title: string; links: { href: string; label: string }[] }[] = [
   {
@@ -38,25 +38,13 @@ export async function PublicFooter() {
   }
 
   return (
-    <footer className="border-t border-border/60 bg-muted/30">
-      <div className="container grid gap-10 px-4 py-12 sm:grid-cols-2 lg:grid-cols-4">
+    <footer className="border-t border-border bg-card dark:border-white/10 dark:bg-[#05070b]">
+      <div className="container grid gap-10 px-4 py-14 sm:grid-cols-2 lg:grid-cols-5">
         <div className="space-y-3 sm:col-span-2 lg:col-span-1">
-          <Link href="/" className="font-display text-xl font-bold text-foreground hover:text-foreground/80">
-            Move-Tick
-          </Link>
+          <Link href="/" className="block w-fit transition-opacity hover:opacity-85"><MoveTickBrand className="-mb-6 -mt-14 scale-75 origin-left" /></Link>
           <p className="max-w-xs text-sm text-muted-foreground">
             Discover, host, and check in to events — ticketing built for organizers who want it to
             just work.
-          </p>
-          <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
-            <Image src="/brand/mb-logo-black.png" alt="" width={16} height={22} className="h-4 w-auto opacity-70 dark:hidden" />
-            <Image src="/brand/mb-logo-white.png" alt="" width={16} height={22} className="hidden h-4 w-auto opacity-70 dark:block" />
-            Move-Tick is a subsidiary of M. V. Beyond
-          </div>
-          <p className="max-w-xs text-xs text-muted-foreground/80">
-            Legal name: M. V. Beyond.
-            <br />
-            Tax Number: 769-465-315
           </p>
         </div>
 
@@ -76,6 +64,11 @@ export async function PublicFooter() {
             </nav>
           </div>
         ))}
+        <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">A Move Beyond company</p>
+          <MoveBeyondMark className="-ml-4" />
+          <p className="text-xs leading-relaxed text-muted-foreground/80">Legal name: M. V. Beyond<br />Tax Number: 769-465-315</p>
+        </div>
       </div>
       <div className="container flex flex-col items-center justify-between gap-2 border-t border-border/60 px-4 py-4 sm:flex-row">
         <p className="text-xs text-muted-foreground">© {year} Move-Tick by Move Beyond. All rights reserved.</p>

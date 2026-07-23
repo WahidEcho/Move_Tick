@@ -14,6 +14,49 @@ import { sendAdminOrgAlert } from '@/services/admin-alerts.service';
 import { getOrganizationMembers } from '@/services/organizations.service';
 import { createNotification } from '@/services/notifications.service';
 import type { EventInput, EventSettingsInput } from '@/lib/validations';
+import { createServiceClient } from '@/lib/supabase-server';
+
+export interface EventStoryInput {
+  media: { media_type: 'image' | 'video'; url: string; poster_url?: string | null; alt_text?: string | null; caption?: string | null }[];
+  highlights: { title: string; description?: string | null; icon_key?: string | null }[];
+  agenda: { starts_at: string; ends_at?: string | null; title: string; description?: string | null; location?: string | null }[];
+  speakers: { name: string; role?: string | null; biography?: string | null; image_url?: string | null; social_url?: string | null }[];
+  faqs: { question: string; answer: string }[];
+}
+
+export async function replaceEventStoryAction(eventId: string, input: EventStoryInput): Promise<{ success: true } | { success: false; error: string }> {
+  const access = await getEventManageAccess(eventId);
+  if (!access) return { success: false, error: 'Event not found' };
+  if ([input.media, input.highlights, input.agenda, input.speakers, input.faqs].some((items) => items.length > 40)) {
+    return { success: false, error: 'Each story section is limited to 40 items.' };
+  }
+
+  const supabase = createServiceClient();
+  const sections = [
+    ['event_media', input.media],
+    ['event_highlights', input.highlights],
+    ['event_agenda_items', input.agenda],
+    ['event_speakers', input.speakers],
+    ['event_faqs', input.faqs],
+  ] as const;
+
+  try {
+    for (const [table, values] of sections) {
+      const { error: deleteError } = await supabase.from(table).delete().eq('event_id', eventId);
+      if (deleteError) throw deleteError;
+      if (values.length) {
+        const rows = values.map((value, sort_order) => ({ ...value, event_id: eventId, sort_order }));
+        const { error: insertError } = await supabase.from(table).insert(rows);
+        if (insertError) throw insertError;
+      }
+    }
+    revalidatePath(`/organizer/events/${eventId}/edit`);
+    revalidatePath(`/events/${access.event.slug}`);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to save event story' };
+  }
+}
 
 export async function updateEventAction(
   eventId: string,
@@ -29,7 +72,10 @@ export async function updateEventAction(
       title: data.title,
       slug: data.slug,
       description: data.description,
+      short_summary: data.short_summary || null,
       cover_image_url: data.cover_image_url || null,
+      promo_video_url: data.promo_video_url || null,
+      promo_video_poster_url: data.promo_video_poster_url || null,
       start_date: data.start_date,
       end_date: data.end_date,
       location: data.location ?? null,
@@ -43,6 +89,10 @@ export async function updateEventAction(
       doors_open_time: data.doors_open_time || null,
       maps_url: data.maps_url || null,
       facilities: data.facilities ?? [],
+      age_restriction: data.age_restriction || null,
+      accessibility_notes: data.accessibility_notes || null,
+      refund_policy: data.refund_policy || null,
+      dress_code: data.dress_code || null,
     });
     revalidatePath(`/organizer/events/${eventId}`);
     revalidatePath(`/organizer/events/${eventId}/edit`);
