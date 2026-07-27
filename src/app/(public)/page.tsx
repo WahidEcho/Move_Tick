@@ -2,6 +2,12 @@ import { getPublicEvents, getConfirmedCountsByEvent, getPublicLandingStats, type
 import { Landing, type LandingEvent } from './landing';
 import { getPlatformSettings } from '@/services/platform-settings.service';
 
+// The "Happening soon" list and live stats must always reflect the current
+// database, not a build-time snapshot — without this, Next statically
+// prerenders the homepage and admin changes (hide/archive/publish) never
+// show up until the next deploy.
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   // Surface real upcoming events on the landing page ("Happening soon").
   // Best-effort: the landing must render even if the query fails.
