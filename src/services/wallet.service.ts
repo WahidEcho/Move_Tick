@@ -4,14 +4,14 @@ import { getGoogleWalletSaveUrl } from '@/lib/wallet/google';
 import type { WalletTicketData } from '@/lib/wallet/types';
 
 const TICKET_SELECT =
-  'id, qr_token, is_active, guest_name, profile:profiles(full_name), event:events(title, start_date, end_date, venue, city), ticket_type:ticket_types(name)';
+  'id, qr_token, is_active, guest_name, profile:profiles(full_name, avatar_url), event:events(title, start_date, end_date, venue, city), ticket_type:ticket_types(name)';
 
 type TicketRow = {
   id: string;
   qr_token: string | null;
   is_active: boolean;
   guest_name: string | null;
-  profile: { full_name?: string } | null;
+  profile: { full_name?: string; avatar_url?: string | null } | null;
   event: { title?: string; start_date?: string; end_date?: string; venue?: string; city?: string } | null;
   ticket_type: { name?: string } | null;
 };
@@ -27,6 +27,7 @@ function toWalletData(data: TicketRow): WalletTicketData {
     city: data.event?.city ?? null,
     ticketTypeName: data.ticket_type?.name ?? 'Ticket',
     attendeeName: data.profile?.full_name ?? data.guest_name ?? 'Guest',
+    attendeeAvatarUrl: data.profile?.avatar_url ?? null,
   };
 }
 

@@ -1,5 +1,7 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { requireAuth } from '@/lib/auth';
+import { isOptimizableImage } from '@/lib/helpers';
 import { createServiceClient } from '@/lib/supabase-server';
 import { getTicket } from '@/services/tickets.service';
 import { getMovementsByTicketId } from '@/services/eventMovements.service';
@@ -117,9 +119,22 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
             />
 
             <div className="relative space-y-5">
-              <div>
-                <p className="font-display text-xl font-bold leading-none">MoveTick</p>
-                <p className="mt-1 text-[11px] text-white/65">by Move Beyond</p>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="font-display text-xl font-bold leading-none">MoveTick</p>
+                  <p className="mt-1 text-[11px] text-white/65">by Move Beyond</p>
+                </div>
+                {/* Attendee photo — mirrors the faded circle on the Wallet pass and PDF. */}
+                {profile.avatar_url && (
+                  <Image
+                    src={profile.avatar_url}
+                    alt=""
+                    width={44}
+                    height={44}
+                    unoptimized={!isOptimizableImage(profile.avatar_url)}
+                    className="size-11 shrink-0 rounded-full object-cover opacity-55"
+                  />
+                )}
               </div>
 
               <div className="border-t border-white/10 pt-4">

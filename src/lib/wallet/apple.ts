@@ -2,12 +2,38 @@ import { PKPass } from 'passkit-generator';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { getAppleConfig } from './config';
+import { getCircularAvatarPng } from '@/lib/avatar-image';
 import type { WalletTicketData } from './types';
 
 const ASSETS_DIR = join(process.cwd(), 'src/lib/wallet/assets');
 
 function asset(name: string): Buffer {
   return readFileSync(join(ASSETS_DIR, name));
+}
+
+/** Apple's thumbnail slot is 90pt square; ship all three scales. */
+const THUMBNAIL_SCALES: { file: string; px: number }[] = [
+  { file: 'thumbnail.png', px: 90 },
+  { file: 'thumbnail@2x.png', px: 180 },
+  { file: 'thumbnail@3x.png', px: 270 },
+];
+
+/**
+ * The attendee's photo as pass thumbnails, or an empty object when they have
+ * none — Wallet reflows cleanly without a thumbnail, so omitting is the
+ * fallback rather than substituting a placeholder.
+ */
+async function thumbnailAssets(avatarUrl?: string | null): Promise<Record<string, Buffer>> {
+  if (!avatarUrl) return {};
+
+  const rendered = await Promise.all(
+    THUMBNAIL_SCALES.map(async ({ file, px }) => ({ file, png: await getCircularAvatarPng(avatarUrl, px) }))
+  );
+
+  // All-or-nothing: a partial set would leave Wallet picking a mismatched scale.
+  if (rendered.some(({ png }) => png === null)) return {};
+
+  return Object.fromEntries(rendered.map(({ file, png }) => [file, png as Buffer]));
 }
 
 // Mirrors the in-app/web ticket card: dark indigo gradient background
@@ -31,6 +57,11 @@ export async function generateApplePass(ticket: WalletTicketData): Promise<Buffe
     ? new Date(new Date(ticket.eventEndISO).getTime() + 24 * 60 * 60 * 1000).toISOString()
     : undefined;
 
+  // NOTE: never add strip.png to this pass. For eventTicket, Apple renders
+  // *either* a strip *or* the background + thumbnail — adding a strip would
+  // silently drop both the branded background and the attendee photo.
+  const thumbnails = await thumbnailAssets(ticket.attendeeAvatarUrl);
+
   const pass = new PKPass(
     {
       'icon.png': asset('icon.png'),
@@ -40,6 +71,7 @@ export async function generateApplePass(ticket: WalletTicketData): Promise<Buffe
       'background.png': asset('background.png'),
       'background@2x.png': asset('background@2x.png'),
       'background@3x.png': asset('background@3x.png'),
+      ...thumbnails,
     },
     {
       wwdr: cfg.wwdrCert,

@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, degrees, type PDFFont, type PDFPage, type RGB } from 'pdf-lib';
 import { dataUrlToBase64 } from './email';
+import { getCircularAvatarPng } from './avatar-image';
 
 // Move-Tick wallet-card palette (matches the web ticket card + brand purple/green).
 const GRADIENT_TOP: [number, number, number] = [0x12 / 255, 0x0e / 255, 0x28 / 255]; // #120E28
@@ -23,7 +24,16 @@ export interface TicketPdfData {
   /** PNG data URL (data:image/png;base64,...) — the ticket's QR code. */
   qrPngDataUrl: string;
   organizationName?: string | null;
+  /**
+   * The attendee's profile photo, drawn as a faded circle in the header.
+   * Optional on purpose: bulk/blast senders can pass null to skip the extra
+   * fetch per email when throughput matters more than personalization.
+   */
+  attendeeAvatarUrl?: string | null;
 }
+
+/** Header photo: 44pt on the page, rendered at 3x so it stays crisp when zoomed. */
+const AVATAR_PT = 44;
 
 /** Wrap text to a max width, returning lines. */
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
@@ -107,6 +117,23 @@ export async function generateTicketPdf(data: TicketPdfData): Promise<Uint8Array
   // Header: MoveTick wordmark
   page.drawText('MoveTick', { x: margin, y: height - 58, size: 22, font: bold, color: WHITE });
   page.drawText('by Move Beyond', { x: margin, y: height - 74, size: 9, font, color: WHITE, opacity: 0.65 });
+
+  // Attendee photo — a faded circle opposite the wordmark, clear of the notch.
+  // The circular crop and fade are baked into the PNG's alpha channel.
+  const avatarPng = await getCircularAvatarPng(data.attendeeAvatarUrl, AVATAR_PT * 3);
+  if (avatarPng) {
+    try {
+      const avatar = await pdf.embedPng(avatarPng);
+      page.drawImage(avatar, {
+        x: width - margin - AVATAR_PT,
+        y: height - 58 - AVATAR_PT / 2 - 6,
+        width: AVATAR_PT,
+        height: AVATAR_PT,
+      });
+    } catch {
+      // Never let a photo break the ticket — the rest of the card is unaffected.
+    }
+  }
 
   const divider = (y: number) =>
     page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.8, color: DIVIDER, opacity: 0.14 });

@@ -11,4 +11,10 @@ export interface WalletTicketData {
   city?: string | null;
   ticketTypeName: string;
   attendeeName: string;
+  /**
+   * The attendee's profile photo (uploaded, or from Google sign-in). Rendered
+   * as the pass thumbnail — a faded circle. Absent for guest tickets and for
+   * accounts with no photo, in which case the pass simply has no thumbnail.
+   */
+  attendeeAvatarUrl?: string | null;
 }

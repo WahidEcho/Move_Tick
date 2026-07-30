@@ -40,7 +40,7 @@ export async function sendTicketEmail(
   const { data: ticket, error } = await supabase
     .from('tickets')
     .select(
-      '*, profile:profiles(email, full_name), event:events(title, start_date, venue, city), ticket_type:ticket_types(name)'
+      '*, profile:profiles(email, full_name, avatar_url), event:events(title, start_date, venue, city), ticket_type:ticket_types(name)'
     )
     .eq('id', ticketId)
     .single();
@@ -49,7 +49,7 @@ export async function sendTicketEmail(
     return { ok: false, error: `ticket_lookup_failed: ${error?.message ?? 'not found'}` };
   }
 
-  const profile = ticket.profile as { email?: string; full_name?: string } | null;
+  const profile = ticket.profile as { email?: string; full_name?: string; avatar_url?: string | null } | null;
   const event = ticket.event as { title?: string; start_date?: string; venue?: string; city?: string } | null;
   const ticketType = ticket.ticket_type as { name?: string } | null;
 
@@ -117,6 +117,7 @@ export async function sendTicketEmail(
           ticketTypeName: ticketType?.name || 'Ticket',
           attendeeName: recipientName === 'there' ? 'Guest' : recipientName,
           qrPngDataUrl: qrDataUrl,
+          attendeeAvatarUrl: profile?.avatar_url ?? null,
       });
       attachments = [
         { filename: 'ticket.pdf', content: Buffer.from(pdfBytes).toString('base64') },
