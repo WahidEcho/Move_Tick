@@ -129,10 +129,10 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
                   <Image
                     src={profile.avatar_url}
                     alt=""
-                    width={44}
-                    height={44}
+                    width={256}
+                    height={256}
                     unoptimized={!isOptimizableImage(profile.avatar_url)}
-                    className="size-11 shrink-0 rounded-full object-cover opacity-55"
+                    className="size-32 shrink-0 rounded-full object-cover opacity-55"
                   />
                 )}
               </div>

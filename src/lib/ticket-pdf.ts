@@ -32,8 +32,11 @@ export interface TicketPdfData {
   attendeeAvatarUrl?: string | null;
 }
 
-/** Header photo: 44pt on the page, rendered at 3x so it stays crisp when zoomed. */
-const AVATAR_PT = 44;
+/**
+ * Header photo: sized to fill the header band beside the wordmark, rendered at
+ * 3x so it stays crisp when the PDF is zoomed or printed.
+ */
+const AVATAR_PT = 84;
 
 /** Wrap text to a max width, returning lines. */
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
@@ -126,7 +129,9 @@ export async function generateTicketPdf(data: TicketPdfData): Promise<Uint8Array
       const avatar = await pdf.embedPng(avatarPng);
       page.drawImage(avatar, {
         x: width - margin - AVATAR_PT,
-        y: height - 58 - AVATAR_PT / 2 - 6,
+        // Sits inside the header band (page top down to the divider at
+        // height-100), so enlarging it never collides with the EVENT block.
+        y: height - 8 - AVATAR_PT,
         width: AVATAR_PT,
         height: AVATAR_PT,
       });
