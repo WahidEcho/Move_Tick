@@ -47,6 +47,13 @@ export default function PrivacyPage() {
           it reviewed by qualified counsel before launch.
         </em>
       </p>
+      <p>
+        M. V. Beyond
+        <br />
+        2B Police Towers, Maadi, Cairo, Egypt
+        <br />
+        +20 10 39048775
+      </p>
     </ContentPage>
   );
 }

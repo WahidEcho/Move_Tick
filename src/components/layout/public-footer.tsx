@@ -67,7 +67,12 @@ export async function PublicFooter() {
         <div className="space-y-2 sm:col-span-2 lg:col-span-1">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">A Move Beyond company</p>
           <MoveBeyondMark className="-ml-4" />
-          <p className="text-xs leading-relaxed text-muted-foreground/80">Legal name: M. V. Beyond<br />Tax Number: 769-465-315</p>
+          <p className="text-xs leading-relaxed text-muted-foreground/80">
+            Legal name: M. V. Beyond<br />
+            Tax Number: 769-465-315<br />
+            2B Police Towers, Maadi, Cairo, Egypt<br />
+            +20 10 39048775
+          </p>
         </div>
       </div>
       <div className="container flex flex-col items-center justify-between gap-2 border-t border-border/60 px-4 py-4 sm:flex-row">
