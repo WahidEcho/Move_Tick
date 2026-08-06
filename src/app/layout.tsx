@@ -20,9 +20,12 @@ export const metadata: Metadata = {
   title: 'Move-Tick — Discover. Connect. Experience.',
   description: 'Move-Tick by Move Beyond — the modern event platform. Discover events, buy tickets in seconds, and run world-class check-in.',
   icons: {
-    icon: [{ url: '/brand/Icon-512.png', type: 'image/png' }],
-    shortcut: '/brand/Icon-512.png',
-    apple: '/brand/Icon-512.png',
+    // src/app/favicon.ico (16/32/48/256, transparent) is picked up
+    // automatically by Next.js as the browser-tab icon; these cover the
+    // larger/PWA/home-screen surfaces.
+    icon: [{ url: '/brand/movetick-icon-512.png', type: 'image/png', sizes: '512x512' }],
+    shortcut: '/brand/movetick-icon-512.png',
+    apple: [{ url: '/brand/movetick-icon-180.png', sizes: '180x180', type: 'image/png' }],
   },
   openGraph: {
     title: 'Move-Tick — Discover. Connect. Experience.',
